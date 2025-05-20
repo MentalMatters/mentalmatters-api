@@ -106,3 +106,37 @@ export const resourceTags = sqliteTable("resource_tags", {
 		.notNull()
 		.references(() => tags.id, { onDelete: "cascade" }),
 });
+
+// Moods
+export const moods = sqliteTable("moods", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	name: text("name").notNull().unique(), // e.g., "happy", "anxious"
+	description: text("description"), // Optional: a short description of the mood
+	emoji: text("emoji"), // Optional: emoji representation, e.g., "😊"
+	language: text("language")
+		.notNull()
+		.references(() => languages.code, { onDelete: "restrict" }),
+	createdAt: integer("created_at", { mode: "timestamp" }).default(
+		sql`(strftime('%s', 'now'))`,
+	),
+	updatedAt: integer("updated_at", { mode: "timestamp" }).default(
+		sql`(strftime('%s', 'now'))`,
+	),
+});
+
+// Quotes
+export const quotes = sqliteTable("quotes", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	quoteText: text("quote_text").notNull().unique(),
+	author: text("author"), // Optional: who said/wrote the quote
+	category: text("category"), // Optional: e.g., "hope", "resilience"
+	language: text("language")
+		.notNull()
+		.references(() => languages.code, { onDelete: "restrict" }),
+	createdAt: integer("created_at", { mode: "timestamp" }).default(
+		sql`(strftime('%s', 'now'))`,
+	),
+	updatedAt: integer("updated_at", { mode: "timestamp" }).default(
+		sql`(strftime('%s', 'now'))`,
+	),
+});
