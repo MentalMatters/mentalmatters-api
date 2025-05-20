@@ -24,7 +24,7 @@ export const app = new Elysia()
 	.use(affirmationsRoute)
 	.listen(3000, (server) => {
 		console.log(
-			`❤️‍🩹 MentalMatters api running on: ${server.hostname}:${server.port}`,
+			`❤️‍🩹 MentalMatters api is now running on: ${server.hostname}:${server.port}`,
 		);
 	});
 
