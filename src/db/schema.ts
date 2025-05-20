@@ -140,3 +140,21 @@ export const quotes = sqliteTable("quotes", {
 		sql`(strftime('%s', 'now'))`,
 	),
 });
+
+export enum ApiKeyRole {
+	USER = "USER",
+	ADMIN = "ADMIN",
+}
+
+export const apiKeys = sqliteTable("api_keys", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	key: text("key").notNull().unique(),
+	label: text("label"),
+	role: text("role", { enum: [ApiKeyRole.USER, ApiKeyRole.ADMIN] })
+		.notNull()
+		.default(ApiKeyRole.USER),
+	createdAt: integer("created_at", { mode: "timestamp" }).default(
+		sql`(strftime('%s', 'now'))`,
+	),
+	revoked: integer("revoked").notNull().default(0),
+});
