@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `affirmations_text_unique` ON `affirmations` (`text`);
