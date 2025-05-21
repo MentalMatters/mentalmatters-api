@@ -16,7 +16,7 @@ import {
 
 const idParamSchema = t.Object({ id: t.String() });
 
-export const affirmationsAdminRoute = new Elysia({ prefix: "/" })
+export const affirmationsAdminRoute = new Elysia({ prefix: "/admin" })
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.ADMIN }))
 
 	// Create affirmation

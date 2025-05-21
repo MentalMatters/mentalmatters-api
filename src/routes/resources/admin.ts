@@ -7,7 +7,7 @@ import { createResourceSchema, updateResourceSchema } from "./schema";
 
 const idParamSchema = t.Object({ id: t.String() });
 
-export const resourcesAdminRoute = new Elysia({ prefix: "/" })
+export const resourcesAdminRoute = new Elysia({ prefix: "/admin" })
 	// Only ADMIN keys allowed for mutating routes
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.ADMIN }))
 

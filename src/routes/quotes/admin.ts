@@ -7,7 +7,7 @@ import { createQuoteSchema, updateQuoteSchema } from "./schema";
 
 const idParamSchema = t.Object({ id: t.String() });
 
-export const quotesAdminRoute = new Elysia({ prefix: "/" })
+export const quotesAdminRoute = new Elysia({ prefix: "/admin" })
 	// only ADMIN keys
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.ADMIN }))
 

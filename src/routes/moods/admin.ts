@@ -7,7 +7,7 @@ import { updateMoodSchema } from "./schema";
 
 const idParamSchema = t.Object({ id: t.String() });
 
-export const moodsAdminRoute = new Elysia({ prefix: "/" })
+export const moodsAdminRoute = new Elysia({ prefix: "/admin" })
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.ADMIN })) // admin only
 
 	// Update mood

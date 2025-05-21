@@ -7,7 +7,7 @@ import { updateLanguageSchema } from "./schema";
 
 const codeParamSchema = t.Object({ code: t.String() });
 
-export const languagesAdminRoute = new Elysia({ prefix: "/" })
+export const languagesAdminRoute = new Elysia({ prefix: "/admin" })
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.ADMIN }))
 
 	// Admin: Update language

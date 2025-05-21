@@ -7,7 +7,7 @@ import { updateTagSchema } from "./schema";
 
 const idParamSchema = t.Object({ id: t.String() });
 
-export const tagsAdminRoute = new Elysia({ prefix: "/" })
+export const tagsAdminRoute = new Elysia({ prefix: "/admin" })
 	// Only ADMIN keys allowed for update & delete
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.ADMIN }))
 

@@ -11,7 +11,7 @@ import {
 } from "./schema";
 
 // No prefix here!
-export const apiKeysAdminRoute = new Elysia({ prefix: "/" })
+export const apiKeysAdminRoute = new Elysia({ prefix: "/admin" })
 	// Require ADMIN API key for all routes in this group
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.ADMIN }))
 
