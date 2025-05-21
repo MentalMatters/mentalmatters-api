@@ -1,6 +1,6 @@
 import Elysia from "elysia";
 import { v4 as uuid } from "uuid";
-import { formatResponse } from "@/utils"; // <-- import
+import { formatResponse } from "@/utils";
 import { db } from "../../db";
 import { ApiKeyRole, apiKeys } from "../../db/schema";
 import { apiKeysAdminRoute } from "./admin";

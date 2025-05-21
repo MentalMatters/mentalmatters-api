@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import Elysia, { t } from "elysia";
 import { apiKeyPlugin } from "@/plugins/apiKey";
-import { formatResponse } from "@/utils"; // <-- import
+import { formatResponse } from "@/utils";
 import { db } from "../../db";
 import { ApiKeyRole, tags } from "../../db/schema";
 import { updateTagSchema } from "./schema";

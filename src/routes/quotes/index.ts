@@ -1,7 +1,7 @@
 import { and, eq, like } from "drizzle-orm";
 import Elysia, { t } from "elysia";
 import { apiKeyPlugin } from "@/plugins/apiKey";
-import { formatResponse } from "@/utils"; // <-- import
+import { formatResponse } from "@/utils";
 import { db } from "../../db";
 import { ApiKeyRole, quotes } from "../../db/schema";
 import { quotesAdminRoute } from "./admin";

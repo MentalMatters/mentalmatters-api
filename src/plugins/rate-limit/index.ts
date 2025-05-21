@@ -6,7 +6,7 @@ import type {
 	RateLimitPluginOptions,
 	RateLimitStore,
 } from "@/@types/plugins/rate-limit";
-import { formatResponse } from "@/utils"; // <-- import
+import { formatResponse } from "@/utils";
 import { getKey } from "./get-key";
 import { MemoryFixedWindowStore } from "./stores/memory-fixed";
 import { MemorySlidingWindowStore } from "./stores/memory-sliding";
