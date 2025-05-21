@@ -33,9 +33,21 @@ export interface RateLimitHeaders {
 	retryAfter?: string;
 }
 
+// Add exactRouteMatch to per-method and per-route configs
 export type PerMethodRateLimit = Partial<
-	Record<HTTPMethod, Partial<RateLimitWindow> & { keyType?: RateLimitKeyType }>
+	Record<
+		HTTPMethod,
+		Partial<RateLimitWindow> & {
+			keyType?: RateLimitKeyType;
+			exactRouteMatch?: boolean;
+		}
+	>
 >;
+
+export interface RouteRateLimitConfig extends Partial<RateLimitWindow> {
+	keyType?: RateLimitKeyType;
+	exactRouteMatch?: boolean;
+}
 
 export interface RateLimitStore {
 	incr(
@@ -54,11 +66,7 @@ export interface RateLimitPluginOptions<
 	algorithm?: RateLimitAlgorithm;
 	keyType?: RateLimitKeyType;
 	global?: RateLimitWindow;
-	routes?: Record<
-		string,
-		| (Partial<RateLimitWindow> & { keyType?: RateLimitKeyType })
-		| PerMethodRateLimit
-	>;
+	routes?: Record<string, RouteRateLimitConfig | PerMethodRateLimit>;
 	whitelist?: (string | number)[];
 	blacklist?: (string | number)[];
 	getId?: (ctx: Context) => string | number | undefined;

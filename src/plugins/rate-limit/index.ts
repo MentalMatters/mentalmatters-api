@@ -5,6 +5,7 @@ import type {
 	RateLimitKeyType,
 	RateLimitPluginOptions,
 	RateLimitStore,
+	RouteRateLimitConfig,
 } from "@/@types/plugins/rate-limit";
 import { formatResponse } from "@/utils";
 import { getKey } from "./get-key";
@@ -26,6 +27,80 @@ function isPerMethodRateLimit(obj: unknown): obj is PerMethodRateLimit {
 		"HEAD",
 	];
 	return methodKeys.some((k) => k in obj);
+}
+
+// Helper: Get exactRouteMatch from config (per-route or per-method)
+function getRouteExactMatch(
+	routeConfig: RouteRateLimitConfig | PerMethodRateLimit,
+	method: HTTPMethod,
+): boolean {
+	if (isPerMethodRateLimit(routeConfig) && method in routeConfig) {
+		const methodConfig = (routeConfig as PerMethodRateLimit)[method];
+		if (
+			methodConfig &&
+			typeof methodConfig === "object" &&
+			"exactRouteMatch" in methodConfig
+		) {
+			return !!methodConfig.exactRouteMatch;
+		}
+	}
+	if (
+		routeConfig &&
+		typeof routeConfig === "object" &&
+		"exactRouteMatch" in routeConfig
+	) {
+		return !!routeConfig.exactRouteMatch;
+	}
+	return false; // default: prefix match
+}
+
+function normalizePath(path: string): string {
+	// Remove trailing slash unless it's the root "/"
+	return path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
+}
+
+// Helper: Find route config by exact or prefix match, per-route/per-method
+function findRouteConfig(
+	routes: Record<string, RouteRateLimitConfig | PerMethodRateLimit>,
+	routeKey: string,
+	method: HTTPMethod,
+): {
+	config: RouteRateLimitConfig | PerMethodRateLimit | undefined;
+	matchedKey: string | null;
+} {
+	let matchedKey: string | null = null;
+	let matchedConfig: RouteRateLimitConfig | PerMethodRateLimit | undefined;
+	let longestPrefix = -1;
+
+	const normalizedRouteKey = normalizePath(routeKey);
+
+	for (const key in routes) {
+		const config = routes[key];
+		const exact = getRouteExactMatch(config, method);
+		const normalizedKey = normalizePath(key);
+
+		if (exact) {
+			if (normalizedRouteKey === normalizedKey) {
+				if (normalizedKey.length > longestPrefix) {
+					matchedKey = key;
+					matchedConfig = config;
+					longestPrefix = normalizedKey.length;
+				}
+			}
+		} else {
+			if (
+				normalizedRouteKey === normalizedKey ||
+				normalizedRouteKey.startsWith(`${normalizedKey}/`)
+			) {
+				if (normalizedKey.length > longestPrefix) {
+					matchedKey = key;
+					matchedConfig = config;
+					longestPrefix = normalizedKey.length;
+				}
+			}
+		}
+	}
+	return { config: matchedConfig, matchedKey };
 }
 
 export function rateLimitPlugin<
@@ -67,7 +142,9 @@ export function rateLimitPlugin<
 	const limitExceeded =
 		messages?.limitExceeded ??
 		((_ctx: Context, retryAfter: number) =>
-			`Rate limit exceeded. Try again in ${Math.ceil(retryAfter / 1000)} seconds.`);
+			`Rate limit exceeded. Try again in ${Math.ceil(
+				retryAfter / 1000,
+			)} seconds.`);
 
 	const blacklisted =
 		messages?.blacklisted ??
@@ -124,7 +201,11 @@ export function rateLimitPlugin<
 			}
 
 			const method = ctx.request.method as HTTPMethod;
-			const routeConfig = routes[routeKey];
+			const { config: routeConfig, matchedKey } = findRouteConfig(
+				routes,
+				routeKey,
+				method,
+			);
 
 			let windowMs = global.windowMs;
 			let max = global.max;
@@ -193,7 +274,7 @@ export function rateLimitPlugin<
 				});
 			}
 
-			const key = `ratelimit:${routeKeyType}:${id}:${routeKey}:${method}`;
+			const key = `ratelimit:${routeKeyType}:${id}:${matchedKey ?? routeKey}:${method}`;
 			logDebug("[RateLimit] Store key:", key);
 
 			let current: number;

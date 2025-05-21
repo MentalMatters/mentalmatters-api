@@ -22,13 +22,27 @@ export const app = new Elysia()
 			algorithm: "fixed-window",
 			getServer: () => server,
 			routes: {
-				"/affirmations/": { POST: { max: 1, windowMs: 1_800_000 } }, // 30 minutes
-				"/languages/": { POST: { max: 1, windowMs: 1_800_000 } },
-				"/moods/": { POST: { max: 1, windowMs: 1_800_000 } },
-				"/quotes/": { POST: { max: 1, windowMs: 1_800_000 } },
-				"/resources/": { POST: { max: 1, windowMs: 1_800_000 } },
-				"/tags/": { POST: { max: 1, windowMs: 1_800_000 } },
-				"/api-key/": { POST: { max: 1, windowMs: 10_800_000 } }, // 3 hours
+				"/affirmations/": {
+					POST: { max: 1, windowMs: 1_800_000, exactRouteMatch: false },
+				}, // 30 minutes
+				"/languages/": {
+					POST: { max: 1, windowMs: 1_800_000, exactRouteMatch: false },
+				},
+				"/moods/": {
+					POST: { max: 1, windowMs: 1_800_000, exactRouteMatch: false },
+				},
+				"/quotes/": {
+					POST: { max: 1, windowMs: 1_800_000, exactRouteMatch: false },
+				},
+				"/resources/": {
+					POST: { max: 1, windowMs: 1_800_000, exactRouteMatch: false },
+				},
+				"/tags/": {
+					POST: { max: 1, windowMs: 1_800_000, exactRouteMatch: false },
+				},
+				"/api-key/": {
+					POST: { max: 1, windowMs: 10_800_000, exactRouteMatch: false },
+				}, // 3 hours
 			},
 		}),
 	)
