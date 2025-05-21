@@ -1,6 +1,11 @@
 {
 	"name": "mental-health",
 	"version": "1.0.50",
+	"description": "An API designed to make mental health support accessible to everyone. Available at https://api-mentalmatters.tdanks.com/",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/MentalMatters/mentalmatters-api"
+	},
 	"scripts": {
 		"dev": "bun run --watch src/index.ts",
 		"check": "biome check .",
