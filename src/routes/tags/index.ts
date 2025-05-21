@@ -5,46 +5,12 @@ import { formatResponse } from "@/utils";
 import { db } from "../../db";
 import { ApiKeyRole, tags } from "../../db/schema";
 import { tagsAdminRoute } from "./admin";
-import { createTagSchema, getTagsSchema } from "./schema";
+import { getTagsSchema } from "./schema";
 
 const idParamSchema = t.Object({ id: t.String() });
 
 export const tagsRoute = new Elysia({ prefix: "/tags" })
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.USER }))
-
-	.post(
-		"/",
-		async ({ body }) => {
-			try {
-				const [createdTag] = await db
-					.insert(tags)
-					.values({ name: body.name })
-					.onConflictDoNothing({ target: tags.name })
-					.returning();
-
-				if (!createdTag) {
-					return formatResponse({
-						body: { message: "Tag already exists." },
-						status: 409,
-					});
-				}
-
-				return formatResponse({
-					body: {
-						message: "Tag created",
-						tag: createdTag,
-					},
-					status: 201,
-				});
-			} catch {
-				return formatResponse({
-					body: { message: "Failed to create tag." },
-					status: 500,
-				});
-			}
-		},
-		{ body: createTagSchema },
-	)
 
 	.get(
 		"/",

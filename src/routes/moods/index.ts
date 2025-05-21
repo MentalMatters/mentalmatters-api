@@ -5,36 +5,12 @@ import { formatResponse } from "@/utils";
 import { db } from "../../db";
 import { ApiKeyRole, moods } from "../../db/schema";
 import { moodsAdminRoute } from "./admin";
-import { createMoodSchema, getMoodsSchema } from "./schema";
+import { getMoodsSchema } from "./schema";
 
 const idParamSchema = t.Object({ id: t.String() });
 
 export const moodsRoute = new Elysia({ prefix: "/moods" })
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.USER }))
-
-	.post(
-		"/",
-		async ({ body }) => {
-			const [createdMood] = await db
-				.insert(moods)
-				.values({
-					name: body.name,
-					description: body.description,
-					emoji: body.emoji,
-					language: body.language,
-				})
-				.returning();
-
-			return formatResponse({
-				body: {
-					message: "Mood created",
-					mood: createdMood,
-				},
-				status: 201,
-			});
-		},
-		{ body: createMoodSchema },
-	)
 
 	.get(
 		"/",

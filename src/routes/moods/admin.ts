@@ -4,7 +4,7 @@ import { apiKeyPlugin } from "@/plugins/apiKey";
 import { formatResponse } from "@/utils";
 import { db } from "../../db";
 import { ApiKeyRole, moods } from "../../db/schema";
-import { updateMoodSchema } from "./schema";
+import { createMoodSchema, updateMoodSchema } from "./schema";
 
 const idParamSchema = t.Object({ id: t.String() });
 
@@ -83,4 +83,28 @@ export const moodsAdminRoute = new Elysia({ prefix: "/admin" })
 			});
 		},
 		{ params: idParamSchema },
+	)
+
+	.post(
+		"/",
+		async ({ body }) => {
+			const [createdMood] = await db
+				.insert(moods)
+				.values({
+					name: body.name,
+					description: body.description,
+					emoji: body.emoji,
+					language: body.language,
+				})
+				.returning();
+
+			return formatResponse({
+				body: {
+					message: "Mood created",
+					mood: createdMood,
+				},
+				status: 201,
+			});
+		},
+		{ body: createMoodSchema },
 	);

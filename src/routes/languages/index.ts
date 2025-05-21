@@ -5,46 +5,12 @@ import { formatResponse } from "@/utils";
 import { db } from "../../db";
 import { ApiKeyRole, languages } from "../../db/schema";
 import { languagesAdminRoute } from "./admin";
-import { createLanguageSchema, getLanguagesSchema } from "./schema";
+import { getLanguagesSchema } from "./schema";
 
 const codeParamSchema = t.Object({ code: t.String() });
 
 export const languagesRoute = new Elysia({ prefix: "/languages" })
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.USER }))
-
-	.post(
-		"/",
-		async ({ body }) => {
-			try {
-				const [createdLanguage] = await db
-					.insert(languages)
-					.values({ code: body.code, name: body.name })
-					.onConflictDoNothing({ target: languages.code })
-					.returning();
-
-				if (!createdLanguage) {
-					return formatResponse({
-						body: { message: "Language already exists." },
-						status: 409,
-					});
-				}
-
-				return formatResponse({
-					body: {
-						message: "Language created",
-						language: createdLanguage,
-					},
-					status: 201,
-				});
-			} catch {
-				return formatResponse({
-					body: { message: "Failed to create language." },
-					status: 500,
-				});
-			}
-		},
-		{ body: createLanguageSchema },
-	)
 
 	.get(
 		"/",
