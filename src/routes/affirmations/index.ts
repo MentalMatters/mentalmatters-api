@@ -11,23 +11,56 @@ const idParamSchema = t.Object({ id: t.String() });
 export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 	.use(apiKeyPlugin())
 
-	// Get all approved affirmations
 	.get(
 		"/",
 		async () => {
-			const allAffirmations = await db
-				.select()
+			// Join affirmations with tags
+			const rows = await db
+				.select({
+					id: affirmations.id,
+					text: affirmations.text,
+					category: affirmations.category,
+					language: affirmations.language,
+					tag: tags.name,
+				})
 				.from(affirmations)
+				.leftJoin(
+					affirmationTags,
+					eq(affirmations.id, affirmationTags.affirmationId),
+				)
+				.leftJoin(tags, eq(affirmationTags.tagId, tags.id))
 				.where(eq(affirmations.approved, 1));
+
+			// Group by affirmation
+			const affirmationsMap = new Map<
+				number,
+				{
+					id: number;
+					text: string;
+					category: string;
+					language: string;
+					tags: string[];
+				}
+			>();
+
+			for (const row of rows) {
+				if (!affirmationsMap.has(row.id)) {
+					affirmationsMap.set(row.id, {
+						id: row.id,
+						text: row.text,
+						category: row.category,
+						language: row.language,
+						tags: [],
+					});
+				}
+				if (row.tag) {
+					affirmationsMap.get(row.id)?.tags.push(row.tag);
+				}
+			}
 
 			return new Response(
 				JSON.stringify({
-					affirmations: allAffirmations.map((a) => ({
-						id: a.id,
-						text: a.text,
-						category: a.category,
-						language: a.language,
-					})),
+					affirmations: Array.from(affirmationsMap.values()),
 				}),
 				{
 					status: 200,
@@ -38,7 +71,6 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 		{ query: getAffirmationsSchema },
 	)
 
-	// Get a specific approved affirmation by ID
 	.get(
 		"/:id",
 		async ({ params }) => {
@@ -50,29 +82,44 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 				);
 			}
 
-			const [affirmation] = await db
-				.select()
+			// Join affirmation with tags
+			const rows = await db
+				.select({
+					id: affirmations.id,
+					text: affirmations.text,
+					category: affirmations.category,
+					language: affirmations.language,
+					tag: tags.name,
+					approved: affirmations.approved,
+				})
 				.from(affirmations)
+				.leftJoin(
+					affirmationTags,
+					eq(affirmations.id, affirmationTags.affirmationId),
+				)
+				.leftJoin(tags, eq(affirmationTags.tagId, tags.id))
 				.where(eq(affirmations.id, id));
 
-			if (!affirmation || !affirmation.approved) {
+			if (!rows.length || !rows[0].approved) {
 				return new Response(
 					JSON.stringify({ message: "Affirmation not found" }),
 					{ status: 404, headers: { "Content-Type": "application/json" } },
 				);
 			}
 
-			return new Response(
-				JSON.stringify({
-					affirmation: {
-						id: affirmation.id,
-						text: affirmation.text,
-						category: affirmation.category,
-						language: affirmation.language,
-					},
-				}),
-				{ status: 200, headers: { "Content-Type": "application/json" } },
-			);
+			// Group tags for this affirmation
+			const affirmation = {
+				id: rows[0].id,
+				text: rows[0].text,
+				category: rows[0].category,
+				language: rows[0].language,
+				tags: rows.map((r) => r.tag).filter((tag): tag is string => !!tag), // filter out nulls
+			};
+
+			return new Response(JSON.stringify({ affirmation }), {
+				status: 200,
+				headers: { "Content-Type": "application/json" },
+			});
 		},
 		{ params: idParamSchema },
 	)
