@@ -80,7 +80,7 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 	// Create affirmation (public)
 	.post(
 		"/",
-		async ({ body }) => {
+		async ({ body, apiKey }) => {
 			const newAffirmationEntity = await db.transaction(async (tx) => {
 				const [created] = await tx
 					.insert(affirmations)
@@ -88,7 +88,8 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 						text: body.text,
 						category: body.category,
 						language: body.language,
-						approved: 0, // always unapproved by default
+						approved: apiKey.role === "ADMIN" ? 1 : 0,
+						approvedAt: apiKey.role === "ADMIN" ? new Date() : null,
 					})
 					.returning();
 
