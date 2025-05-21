@@ -49,10 +49,12 @@ export const app = new Elysia()
 	.use(resourcesRoute)
 	.use(tagsRoute)
 	.use(apiKeysRoute)
-	.listen(3000, (server) => {
+	.listen(3000, async (server) => {
 		console.log(
 			`❤️‍🩹 MentalMatters api is now running on: ${server.hostname}:${server.port}`,
 		);
+
+		await import("./cron");
 	});
 
 server = app.server;

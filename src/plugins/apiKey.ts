@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { Elysia } from "elysia";
 import { db } from "../db";
 import { type ApiKeyRole, apiKeys } from "../db/schema";
@@ -28,9 +28,21 @@ export const apiKeyPlugin = (options?: {
 				.from(apiKeys)
 				.where(eq(apiKeys.key, apiKeyValue));
 
-			if (!keyRecord || keyRecord.revoked) {
+			if (!keyRecord) {
 				throw new Response(
 					JSON.stringify({ message: "Unauthorized: Invalid API key" }),
+					{
+						status: 401,
+						headers: { "Content-Type": "application/json" },
+					},
+				);
+			}
+
+			if (keyRecord.revoked) {
+				throw new Response(
+					JSON.stringify({
+						message: "Unauthorized: Your API key has been revoked",
+					}),
 					{
 						status: 401,
 						headers: { "Content-Type": "application/json" },
@@ -64,6 +76,12 @@ export const apiKeyPlugin = (options?: {
 					);
 				}
 			}
+
+			// Update lastUsed timestamp
+			await db
+				.update(apiKeys)
+				.set({ lastUsed: sql`(strftime('%s', 'now'))` })
+				.where(eq(apiKeys.id, keyRecord.id));
 
 			return { apiKey: keyRecord };
 		});

@@ -157,4 +157,7 @@ export const apiKeys = sqliteTable("api_keys", {
 		sql`(strftime('%s', 'now'))`,
 	),
 	revoked: integer("revoked").notNull().default(0),
+	lastUsed: integer("last_used", { mode: "timestamp" }).default(
+		sql`(strftime('%s', 'now'))`,
+	),
 });
