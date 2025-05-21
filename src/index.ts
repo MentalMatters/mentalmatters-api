@@ -9,6 +9,8 @@ import { quotesRoute } from "./routes/quotes";
 import { resourcesRoute } from "./routes/resources";
 import { tagsRoute } from "./routes/tags";
 
+const PORT = Number(process.env.PORT) ?? 5177;
+
 export let server: Server | null = null;
 
 export const app = new Elysia()
@@ -49,7 +51,7 @@ export const app = new Elysia()
 	.use(resourcesRoute)
 	.use(tagsRoute)
 	.use(apiKeysRoute)
-	.listen(3000, async (server) => {
+	.listen(PORT, async (server) => {
 		console.log(
 			`❤️‍🩹 MentalMatters api is now running on: ${server.hostname}:${server.port}`,
 		);
