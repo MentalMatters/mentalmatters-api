@@ -9,41 +9,36 @@ import { quotesRoute } from "./routes/quotes";
 import { resourcesRoute } from "./routes/resources";
 import { tagsRoute } from "./routes/tags";
 
-const PORT = Number(process.env.PORT) ?? 5177;
+// Use 5177 as default if process.env.PORT is not set or invalid
+const PORT = Number(process.env.PORT) || 5177;
 
 export let server: Server | null = null;
 
 export const app = new Elysia()
+	// Rate limiting plugin
 	.use(
 		rateLimitPlugin({
 			algorithm: "fixed-window",
 			getServer: () => server,
 			routes: {
-				"/affirmations/": {
-					POST: { max: 1, windowMs: 30_0000 }, // 30 minutes
-				},
-				"/languages/": {
-					POST: { max: 1, windowMs: 30_0000 },
-				},
-				"/moods/": {
-					POST: { max: 1, windowMs: 30_0000 },
-				},
-				"/quotes/": {
-					POST: { max: 1, windowMs: 30_0000 },
-				},
-				"/resources/": {
-					POST: { max: 1, windowMs: 30_0000 },
-				},
-				"/tags/": {
-					POST: { max: 1, windowMs: 30_0000 },
-				},
-				"/api-key/": {
-					POST: { max: 1, windowMs: 10_800_000 }, // every 3 hours
-				},
+				"/affirmations/": { POST: { max: 1, windowMs: 1_800_000 } }, // 30 minutes
+				"/languages/": { POST: { max: 1, windowMs: 1_800_000 } },
+				"/moods/": { POST: { max: 1, windowMs: 1_800_000 } },
+				"/quotes/": { POST: { max: 1, windowMs: 1_800_000 } },
+				"/resources/": { POST: { max: 1, windowMs: 1_800_000 } },
+				"/tags/": { POST: { max: 1, windowMs: 1_800_000 } },
+				"/api-key/": { POST: { max: 1, windowMs: 10_800_000 } }, // 3 hours
 			},
 		}),
 	)
-	.get("/", () => "Hello Elysia")
+
+	// Root route
+	.get("/", () => ({
+		message:
+			"Hello, friend! Remember, you matter and support is always here for you. Take care.",
+	}))
+
+	// API routes
 	.use(affirmationsRoute)
 	.use(languagesRoute)
 	.use(moodsRoute)
@@ -51,11 +46,43 @@ export const app = new Elysia()
 	.use(resourcesRoute)
 	.use(tagsRoute)
 	.use(apiKeysRoute)
+
+	// Global error handler (handles 404 and other errors)
+	.onError(({ code, error, request }) => {
+		if (code === "NOT_FOUND") {
+			return new Response(
+				JSON.stringify({
+					message:
+						"Welcome, friend! The resource you’re looking for was not found, but support is always here for you.",
+					path: request.url,
+				}),
+				{
+					status: 404,
+					headers: { "Content-Type": "application/json" },
+				},
+			);
+		}
+
+		// Log unexpected errors for debugging
+		console.error(error);
+
+		return new Response(
+			JSON.stringify({
+				message:
+					"Oops! Something went wrong, and we're on it. Please try again later.",
+			}),
+			{
+				status: 500,
+				headers: { "Content-Type": "application/json" },
+			},
+		);
+	})
+
+	// Start the server
 	.listen(PORT, async (server) => {
 		console.log(
-			`❤️‍🩹 MentalMatters api is now running on: ${server.hostname}:${server.port}`,
+			`❤️‍🩹 MentalMatters API is now running on: ${server.hostname}:${server.port}`,
 		);
-
 		await import("./cron");
 	});
 
