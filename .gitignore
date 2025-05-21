@@ -43,3 +43,6 @@ package-lock.json
 
 *.db
 sqlite.db
+
+.env
+.env.*
