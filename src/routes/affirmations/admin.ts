@@ -1,6 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 import Elysia, { t } from "elysia";
 import { apiKeyPlugin } from "@/plugins/apiKey";
+import { formatResponse } from "@/utils";
 import { db } from "../../db";
 import {
 	ApiKeyRole,
@@ -67,16 +68,16 @@ export const affirmationsAdminRoute = new Elysia({ prefix: "/admin" })
 				return created;
 			});
 
-			return new Response(
-				JSON.stringify({
+			return formatResponse({
+				body: {
 					message: "Successfully created affirmation",
 					affirmation: {
 						id: newAffirmationEntity.id,
 						text: newAffirmationEntity.text,
 					},
-				}),
-				{ status: 201, headers: { "Content-Type": "application/json" } },
-			);
+				},
+				status: 201,
+			});
 		},
 		{ body: createAffirmationSchema },
 	)
@@ -87,10 +88,10 @@ export const affirmationsAdminRoute = new Elysia({ prefix: "/admin" })
 		async ({ params, body }) => {
 			const id = Number(params.id);
 			if (Number.isNaN(id))
-				return new Response(
-					JSON.stringify({ message: "Invalid affirmation ID" }),
-					{ status: 400 },
-				);
+				return formatResponse({
+					body: { message: "Invalid affirmation ID" },
+					status: 400,
+				});
 
 			const [existing] = await db
 				.select()
@@ -98,10 +99,10 @@ export const affirmationsAdminRoute = new Elysia({ prefix: "/admin" })
 				.where(eq(affirmations.id, id));
 
 			if (!existing)
-				return new Response(
-					JSON.stringify({ message: "Affirmation not found" }),
-					{ status: 404 },
-				);
+				return formatResponse({
+					body: { message: "Affirmation not found" },
+					status: 404,
+				});
 
 			const [updated] = await db
 				.update(affirmations)
@@ -114,8 +115,8 @@ export const affirmationsAdminRoute = new Elysia({ prefix: "/admin" })
 				.where(eq(affirmations.id, id))
 				.returning();
 
-			return new Response(
-				JSON.stringify({
+			return formatResponse({
+				body: {
 					message: "Affirmation updated",
 					affirmation: {
 						id: updated.id,
@@ -123,9 +124,9 @@ export const affirmationsAdminRoute = new Elysia({ prefix: "/admin" })
 						category: updated.category,
 						language: updated.language,
 					},
-				}),
-				{ status: 200 },
-			);
+				},
+				status: 200,
+			});
 		},
 		{ body: updateAffirmationSchema, params: idParamSchema },
 	)
@@ -136,10 +137,10 @@ export const affirmationsAdminRoute = new Elysia({ prefix: "/admin" })
 		async ({ params }) => {
 			const id = Number(params.id);
 			if (Number.isNaN(id))
-				return new Response(
-					JSON.stringify({ message: "Invalid affirmation ID" }),
-					{ status: 400 },
-				);
+				return formatResponse({
+					body: { message: "Invalid affirmation ID" },
+					status: 400,
+				});
 
 			const [deleted] = await db
 				.delete(affirmations)
@@ -147,12 +148,13 @@ export const affirmationsAdminRoute = new Elysia({ prefix: "/admin" })
 				.returning();
 
 			if (!deleted)
-				return new Response(
-					JSON.stringify({ message: "Affirmation not found" }),
-					{ status: 404 },
-				);
+				return formatResponse({
+					body: { message: "Affirmation not found" },
+					status: 404,
+				});
 
-			return new Response(JSON.stringify({ message: "Affirmation deleted" }), {
+			return formatResponse({
+				body: { message: "Affirmation deleted" },
 				status: 200,
 			});
 		},
@@ -165,10 +167,10 @@ export const affirmationsAdminRoute = new Elysia({ prefix: "/admin" })
 		async ({ params, body }) => {
 			const id = Number(params.id);
 			if (Number.isNaN(id))
-				return new Response(
-					JSON.stringify({ message: "Invalid affirmation ID" }),
-					{ status: 400 },
-				);
+				return formatResponse({
+					body: { message: "Invalid affirmation ID" },
+					status: 400,
+				});
 
 			const approved = body.approved === true ? 1 : 0;
 
@@ -183,15 +185,15 @@ export const affirmationsAdminRoute = new Elysia({ prefix: "/admin" })
 				.returning();
 
 			if (!updated)
-				return new Response(
-					JSON.stringify({ message: "Affirmation not found" }),
-					{ status: 404 },
-				);
+				return formatResponse({
+					body: { message: "Affirmation not found" },
+					status: 404,
+				});
 
-			return new Response(
-				JSON.stringify({ message: "Approval status updated" }),
-				{ status: 200 },
-			);
+			return formatResponse({
+				body: { message: "Approval status updated" },
+				status: 200,
+			});
 		},
 		{ body: approveAffirmationSchema, params: idParamSchema },
 	);

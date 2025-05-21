@@ -1,5 +1,6 @@
 import { Elysia } from "elysia";
 import type { Server } from "elysia/dist/universal/server";
+import { formatResponse } from "@/utils";
 import { rateLimitPlugin } from "./plugins/rate-limit";
 import { affirmationsRoute } from "./routes/affirmations";
 import { apiKeysRoute } from "./routes/api-keys";
@@ -33,10 +34,15 @@ export const app = new Elysia()
 	)
 
 	// Root route
-	.get("/", () => ({
-		message:
-			"Hello, friend! Remember, you matter and support is always here for you. Take care.",
-	}))
+	.get("/", () =>
+		formatResponse({
+			body: {
+				message:
+					"Hello, friend! Remember, you matter and support is always here for you. Take care.",
+			},
+			status: 200,
+		}),
+	)
 
 	// API routes
 	.use(affirmationsRoute)
@@ -50,32 +56,26 @@ export const app = new Elysia()
 	// Global error handler (handles 404 and other errors)
 	.onError(({ code, error, request }) => {
 		if (code === "NOT_FOUND") {
-			return new Response(
-				JSON.stringify({
+			return formatResponse({
+				body: {
 					message:
 						"Welcome, friend! The resource you’re looking for was not found, but support is always here for you.",
 					path: request.url,
-				}),
-				{
-					status: 404,
-					headers: { "Content-Type": "application/json" },
 				},
-			);
+				status: 404,
+			});
 		}
 
 		// Log unexpected errors for debugging
 		console.error(error);
 
-		return new Response(
-			JSON.stringify({
+		return formatResponse({
+			body: {
 				message:
 					"Oops! Something went wrong, and we're on it. Please try again later.",
-			}),
-			{
-				status: 500,
-				headers: { "Content-Type": "application/json" },
 			},
-		);
+			status: 500,
+		});
 	})
 
 	// Start the server

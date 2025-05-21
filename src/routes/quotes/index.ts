@@ -1,6 +1,7 @@
 import { and, eq, like } from "drizzle-orm";
 import Elysia, { t } from "elysia";
-import { apiKeyPlugin } from "@/plugins/apiKey"; // your plugin
+import { apiKeyPlugin } from "@/plugins/apiKey";
+import { formatResponse } from "@/utils"; // <-- import
 import { db } from "../../db";
 import { ApiKeyRole, quotes } from "../../db/schema";
 import { quotesAdminRoute } from "./admin";
@@ -9,10 +10,8 @@ import { getQuotesSchema } from "./schema";
 const idParamSchema = t.Object({ id: t.String() });
 
 export const quotesRoute = new Elysia({ prefix: "/quotes" })
-	// any valid key (no admin required)
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.USER }))
 
-	// Get all quotes (with optional filtering)
 	.get(
 		"/",
 		async ({ query }) => {
@@ -27,38 +26,37 @@ export const quotesRoute = new Elysia({ prefix: "/quotes" })
 				.from(quotes)
 				.where(filters.length ? and(...filters) : undefined);
 
-			return new Response(JSON.stringify({ quotes: all }), {
+			return formatResponse({
+				body: { quotes: all },
 				status: 200,
-				headers: { "Content-Type": "application/json" },
 			});
 		},
 		{ query: getQuotesSchema },
 	)
 
-	// Get quote by ID
 	.get(
 		"/:id",
 		async ({ params }) => {
 			const id = Number(params.id);
 			if (Number.isNaN(id)) {
-				return new Response(JSON.stringify({ message: "Invalid quote ID" }), {
+				return formatResponse({
+					body: { message: "Invalid quote ID" },
 					status: 400,
-					headers: { "Content-Type": "application/json" },
 				});
 			}
 
 			const [quote] = await db.select().from(quotes).where(eq(quotes.id, id));
 
 			if (!quote) {
-				return new Response(JSON.stringify({ message: "Quote not found" }), {
+				return formatResponse({
+					body: { message: "Quote not found" },
 					status: 404,
-					headers: { "Content-Type": "application/json" },
 				});
 			}
 
-			return new Response(JSON.stringify({ quote }), {
+			return formatResponse({
+				body: { quote },
 				status: 200,
-				headers: { "Content-Type": "application/json" },
 			});
 		},
 		{ params: idParamSchema },

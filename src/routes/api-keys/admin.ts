@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import Elysia from "elysia";
 import { v4 as uuid } from "uuid";
 import { apiKeyPlugin } from "@/plugins/apiKey";
+import { formatResponse } from "@/utils"; // <-- import
 import { db } from "../../db";
 import { ApiKeyRole, apiKeys } from "../../db/schema";
 import {
@@ -10,12 +11,9 @@ import {
 	adminRevokeApiKeyParamsSchema,
 } from "./schema";
 
-// No prefix here!
 export const apiKeysAdminRoute = new Elysia({ prefix: "/admin" })
-	// Require ADMIN API key for all routes in this group
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.ADMIN }))
 
-	// Create a new API key (any role, label optional)
 	.post(
 		"/",
 		async ({ body }) => {
@@ -31,43 +29,41 @@ export const apiKeysAdminRoute = new Elysia({ prefix: "/admin" })
 				})
 				.returning();
 
-			return new Response(
-				JSON.stringify({
+			return formatResponse({
+				body: {
 					message: "API key created (admin)",
 					apiKey: {
 						key: created.key,
 						role: created.role,
 						createdAt: created.createdAt,
 					},
-				}),
-				{ status: 201, headers: { "Content-Type": "application/json" } },
-			);
+				},
+				status: 201,
+			});
 		},
 		{ body: adminCreateApiKeySchema },
 	)
 
-	// List all API keys
 	.get(
 		"/",
 		async () => {
 			const allKeys = await db.select().from(apiKeys);
-			return new Response(JSON.stringify({ apiKeys: allKeys }), {
+			return formatResponse({
+				body: { apiKeys: allKeys },
 				status: 200,
-				headers: { "Content-Type": "application/json" },
 			});
 		},
 		{ query: adminListApiKeysSchema },
 	)
 
-	// Revoke an API key by id
 	.patch(
 		"/:id/revoke",
 		async ({ params }) => {
 			const id = Number(params.id);
 			if (Number.isNaN(id)) {
-				return new Response(JSON.stringify({ message: "Invalid API key ID" }), {
+				return formatResponse({
+					body: { message: "Invalid API key ID" },
 					status: 400,
-					headers: { "Content-Type": "application/json" },
 				});
 			}
 
@@ -78,15 +74,15 @@ export const apiKeysAdminRoute = new Elysia({ prefix: "/admin" })
 				.returning();
 
 			if (!updated) {
-				return new Response(JSON.stringify({ message: "API key not found" }), {
+				return formatResponse({
+					body: { message: "API key not found" },
 					status: 404,
-					headers: { "Content-Type": "application/json" },
 				});
 			}
 
-			return new Response(JSON.stringify({ message: "API key revoked" }), {
+			return formatResponse({
+				body: { message: "API key revoked" },
 				status: 200,
-				headers: { "Content-Type": "application/json" },
 			});
 		},
 		{ params: adminRevokeApiKeyParamsSchema },

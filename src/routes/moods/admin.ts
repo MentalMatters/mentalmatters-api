@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import Elysia, { t } from "elysia";
 import { apiKeyPlugin } from "@/plugins/apiKey";
+import { formatResponse } from "@/utils"; // <-- import
 import { db } from "../../db";
 import { ApiKeyRole, moods } from "../../db/schema";
 import { updateMoodSchema } from "./schema";
@@ -8,26 +9,25 @@ import { updateMoodSchema } from "./schema";
 const idParamSchema = t.Object({ id: t.String() });
 
 export const moodsAdminRoute = new Elysia({ prefix: "/admin" })
-	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.ADMIN })) // admin only
+	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.ADMIN }))
 
-	// Update mood
 	.put(
 		"/:id",
 		async ({ params, body }) => {
 			const id = Number(params.id);
 			if (Number.isNaN(id)) {
-				return new Response(JSON.stringify({ message: "Invalid mood ID" }), {
+				return formatResponse({
+					body: { message: "Invalid mood ID" },
 					status: 400,
-					headers: { "Content-Type": "application/json" },
 				});
 			}
 
 			const [existing] = await db.select().from(moods).where(eq(moods.id, id));
 
 			if (!existing) {
-				return new Response(JSON.stringify({ message: "Mood not found" }), {
+				return formatResponse({
+					body: { message: "Mood not found" },
 					status: 404,
-					headers: { "Content-Type": "application/json" },
 				});
 			}
 
@@ -43,26 +43,25 @@ export const moodsAdminRoute = new Elysia({ prefix: "/admin" })
 				.where(eq(moods.id, id))
 				.returning();
 
-			return new Response(
-				JSON.stringify({
+			return formatResponse({
+				body: {
 					message: "Mood updated",
 					mood: updated,
-				}),
-				{ status: 200, headers: { "Content-Type": "application/json" } },
-			);
+				},
+				status: 200,
+			});
 		},
 		{ body: updateMoodSchema, params: idParamSchema },
 	)
 
-	// Delete mood
 	.delete(
 		"/:id",
 		async ({ params }) => {
 			const id = Number(params.id);
 			if (Number.isNaN(id)) {
-				return new Response(JSON.stringify({ message: "Invalid mood ID" }), {
+				return formatResponse({
+					body: { message: "Invalid mood ID" },
 					status: 400,
-					headers: { "Content-Type": "application/json" },
 				});
 			}
 
@@ -72,15 +71,15 @@ export const moodsAdminRoute = new Elysia({ prefix: "/admin" })
 				.returning();
 
 			if (!deleted) {
-				return new Response(JSON.stringify({ message: "Mood not found" }), {
+				return formatResponse({
+					body: { message: "Mood not found" },
 					status: 404,
-					headers: { "Content-Type": "application/json" },
 				});
 			}
 
-			return new Response(JSON.stringify({ message: "Mood deleted" }), {
+			return formatResponse({
+				body: { message: "Mood deleted" },
 				status: 200,
-				headers: { "Content-Type": "application/json" },
 			});
 		},
 		{ params: idParamSchema },

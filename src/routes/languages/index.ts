@@ -1,6 +1,7 @@
 import { eq, like } from "drizzle-orm";
 import Elysia, { t } from "elysia";
 import { apiKeyPlugin } from "@/plugins/apiKey";
+import { formatResponse } from "@/utils"; // <-- import
 import { db } from "../../db";
 import { ApiKeyRole, languages } from "../../db/schema";
 import { languagesAdminRoute } from "./admin";
@@ -9,9 +10,8 @@ import { createLanguageSchema, getLanguagesSchema } from "./schema";
 const codeParamSchema = t.Object({ code: t.String() });
 
 export const languagesRoute = new Elysia({ prefix: "/languages" })
-	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.USER })) // <-- API key required, any user role
+	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.USER }))
 
-	// Public: Create language
 	.post(
 		"/",
 		async ({ body }) => {
@@ -23,30 +23,29 @@ export const languagesRoute = new Elysia({ prefix: "/languages" })
 					.returning();
 
 				if (!createdLanguage) {
-					return new Response(
-						JSON.stringify({ message: "Language already exists." }),
-						{ status: 409, headers: { "Content-Type": "application/json" } },
-					);
+					return formatResponse({
+						body: { message: "Language already exists." },
+						status: 409,
+					});
 				}
 
-				return new Response(
-					JSON.stringify({
+				return formatResponse({
+					body: {
 						message: "Language created",
 						language: createdLanguage,
-					}),
-					{ status: 201, headers: { "Content-Type": "application/json" } },
-				);
+					},
+					status: 201,
+				});
 			} catch {
-				return new Response(
-					JSON.stringify({ message: "Failed to create language." }),
-					{ status: 500, headers: { "Content-Type": "application/json" } },
-				);
+				return formatResponse({
+					body: { message: "Failed to create language." },
+					status: 500,
+				});
 			}
 		},
 		{ body: createLanguageSchema },
 	)
 
-	// Public: Get all languages (with optional filtering)
 	.get(
 		"/",
 		async ({ query }) => {
@@ -66,24 +65,23 @@ export const languagesRoute = new Elysia({ prefix: "/languages" })
 						: undefined,
 				);
 
-			return new Response(JSON.stringify({ languages: allLanguages }), {
+			return formatResponse({
+				body: { languages: allLanguages },
 				status: 200,
-				headers: { "Content-Type": "application/json" },
 			});
 		},
 		{ query: getLanguagesSchema },
 	)
 
-	// Public: Get language by code
 	.get(
 		"/:code",
 		async ({ params }) => {
 			const code = params.code;
 			if (!code) {
-				return new Response(
-					JSON.stringify({ message: "Invalid language code" }),
-					{ status: 400, headers: { "Content-Type": "application/json" } },
-				);
+				return formatResponse({
+					body: { message: "Invalid language code" },
+					status: 400,
+				});
 			}
 
 			const [language] = await db
@@ -92,15 +90,15 @@ export const languagesRoute = new Elysia({ prefix: "/languages" })
 				.where(eq(languages.code, code));
 
 			if (!language) {
-				return new Response(JSON.stringify({ message: "Language not found" }), {
+				return formatResponse({
+					body: { message: "Language not found" },
 					status: 404,
-					headers: { "Content-Type": "application/json" },
 				});
 			}
 
-			return new Response(JSON.stringify({ language }), {
+			return formatResponse({
+				body: { language },
 				status: 200,
-				headers: { "Content-Type": "application/json" },
 			});
 		},
 		{ params: codeParamSchema },

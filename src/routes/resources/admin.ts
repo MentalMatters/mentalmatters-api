@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import Elysia, { t } from "elysia";
 import { apiKeyPlugin } from "@/plugins/apiKey";
+import { formatResponse } from "@/utils"; // <-- import
 import { db } from "../../db";
 import { ApiKeyRole, resources } from "../../db/schema";
 import { createResourceSchema, updateResourceSchema } from "./schema";
@@ -8,10 +9,8 @@ import { createResourceSchema, updateResourceSchema } from "./schema";
 const idParamSchema = t.Object({ id: t.String() });
 
 export const resourcesAdminRoute = new Elysia({ prefix: "/admin" })
-	// Only ADMIN keys allowed for mutating routes
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.ADMIN }))
 
-	// Create resource
 	.post(
 		"/",
 		async ({ body }) => {
@@ -26,27 +25,26 @@ export const resourcesAdminRoute = new Elysia({ prefix: "/admin" })
 				})
 				.returning();
 
-			return new Response(
-				JSON.stringify({
+			return formatResponse({
+				body: {
 					message: "Resource created",
 					resource: createdResource,
-				}),
-				{ status: 201, headers: { "Content-Type": "application/json" } },
-			);
+				},
+				status: 201,
+			});
 		},
 		{ body: createResourceSchema },
 	)
 
-	// Update resource
 	.put(
 		"/:id",
 		async ({ params, body }) => {
 			const id = Number(params.id);
 			if (Number.isNaN(id)) {
-				return new Response(
-					JSON.stringify({ message: "Invalid resource ID" }),
-					{ status: 400, headers: { "Content-Type": "application/json" } },
-				);
+				return formatResponse({
+					body: { message: "Invalid resource ID" },
+					status: 400,
+				});
 			}
 
 			const [existing] = await db
@@ -55,9 +53,9 @@ export const resourcesAdminRoute = new Elysia({ prefix: "/admin" })
 				.where(eq(resources.id, id));
 
 			if (!existing) {
-				return new Response(JSON.stringify({ message: "Resource not found" }), {
+				return formatResponse({
+					body: { message: "Resource not found" },
 					status: 404,
-					headers: { "Content-Type": "application/json" },
 				});
 			}
 
@@ -73,27 +71,26 @@ export const resourcesAdminRoute = new Elysia({ prefix: "/admin" })
 				.where(eq(resources.id, id))
 				.returning();
 
-			return new Response(
-				JSON.stringify({
+			return formatResponse({
+				body: {
 					message: "Resource updated",
 					resource: updated,
-				}),
-				{ status: 200, headers: { "Content-Type": "application/json" } },
-			);
+				},
+				status: 200,
+			});
 		},
 		{ body: updateResourceSchema, params: idParamSchema },
 	)
 
-	// Delete resource
 	.delete(
 		"/:id",
 		async ({ params }) => {
 			const id = Number(params.id);
 			if (Number.isNaN(id)) {
-				return new Response(
-					JSON.stringify({ message: "Invalid resource ID" }),
-					{ status: 400, headers: { "Content-Type": "application/json" } },
-				);
+				return formatResponse({
+					body: { message: "Invalid resource ID" },
+					status: 400,
+				});
 			}
 
 			const [deleted] = await db
@@ -102,15 +99,15 @@ export const resourcesAdminRoute = new Elysia({ prefix: "/admin" })
 				.returning();
 
 			if (!deleted) {
-				return new Response(JSON.stringify({ message: "Resource not found" }), {
+				return formatResponse({
+					body: { message: "Resource not found" },
 					status: 404,
-					headers: { "Content-Type": "application/json" },
 				});
 			}
 
-			return new Response(JSON.stringify({ message: "Resource deleted" }), {
+			return formatResponse({
+				body: { message: "Resource deleted" },
 				status: 200,
-				headers: { "Content-Type": "application/json" },
 			});
 		},
 		{ params: idParamSchema },

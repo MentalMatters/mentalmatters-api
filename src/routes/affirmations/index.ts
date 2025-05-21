@@ -1,6 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 import Elysia, { t } from "elysia";
 import { apiKeyPlugin } from "@/plugins/apiKey";
+import { formatResponse } from "@/utils"; // <-- import
 import { db } from "../../db";
 import { affirmations, affirmationTags, tags } from "../../db/schema";
 import { affirmationsAdminRoute } from "./admin";
@@ -14,7 +15,6 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 	.get(
 		"/",
 		async () => {
-			// Join affirmations with tags
 			const rows = await db
 				.select({
 					id: affirmations.id,
@@ -31,7 +31,6 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 				.leftJoin(tags, eq(affirmationTags.tagId, tags.id))
 				.where(eq(affirmations.approved, 1));
 
-			// Group by affirmation
 			const affirmationsMap = new Map<
 				number,
 				{
@@ -58,15 +57,12 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 				}
 			}
 
-			return new Response(
-				JSON.stringify({
+			return formatResponse({
+				body: {
 					affirmations: Array.from(affirmationsMap.values()),
-				}),
-				{
-					status: 200,
-					headers: { "Content-Type": "application/json" },
 				},
-			);
+				status: 200,
+			});
 		},
 		{ query: getAffirmationsSchema },
 	)
@@ -76,13 +72,12 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 		async ({ params }) => {
 			const id = Number(params.id);
 			if (Number.isNaN(id)) {
-				return new Response(
-					JSON.stringify({ message: "Invalid affirmation ID" }),
-					{ status: 400, headers: { "Content-Type": "application/json" } },
-				);
+				return formatResponse({
+					body: { message: "Invalid affirmation ID" },
+					status: 400,
+				});
 			}
 
-			// Join affirmation with tags
 			const rows = await db
 				.select({
 					id: affirmations.id,
@@ -101,30 +96,28 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 				.where(eq(affirmations.id, id));
 
 			if (!rows.length || !rows[0].approved) {
-				return new Response(
-					JSON.stringify({ message: "Affirmation not found" }),
-					{ status: 404, headers: { "Content-Type": "application/json" } },
-				);
+				return formatResponse({
+					body: { message: "Affirmation not found" },
+					status: 404,
+				});
 			}
 
-			// Group tags for this affirmation
 			const affirmation = {
 				id: rows[0].id,
 				text: rows[0].text,
 				category: rows[0].category,
 				language: rows[0].language,
-				tags: rows.map((r) => r.tag).filter((tag): tag is string => !!tag), // filter out nulls
+				tags: rows.map((r) => r.tag).filter((tag): tag is string => !!tag),
 			};
 
-			return new Response(JSON.stringify({ affirmation }), {
+			return formatResponse({
+				body: { affirmation },
 				status: 200,
-				headers: { "Content-Type": "application/json" },
 			});
 		},
 		{ params: idParamSchema },
 	)
 
-	// Create affirmation (public)
 	.post(
 		"/",
 		async ({ body, apiKey }) => {
@@ -174,16 +167,16 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 				return created;
 			});
 
-			return new Response(
-				JSON.stringify({
+			return formatResponse({
+				body: {
 					message: "Successfully created affirmation — pending approval.",
 					affirmation: {
 						id: newAffirmationEntity.id,
 						text: newAffirmationEntity.text,
 					},
-				}),
-				{ status: 201, headers: { "Content-Type": "application/json" } },
-			);
+				},
+				status: 201,
+			});
 		},
 		{ body: createAffirmationSchema },
 	)

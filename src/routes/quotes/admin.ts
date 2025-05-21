@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import Elysia, { t } from "elysia";
-import { apiKeyPlugin } from "@/plugins/apiKey"; // your plugin
+import { apiKeyPlugin } from "@/plugins/apiKey";
+import { formatResponse } from "@/utils"; // <-- import
 import { db } from "../../db";
 import { ApiKeyRole, quotes } from "../../db/schema";
 import { createQuoteSchema, updateQuoteSchema } from "./schema";
@@ -8,10 +9,8 @@ import { createQuoteSchema, updateQuoteSchema } from "./schema";
 const idParamSchema = t.Object({ id: t.String() });
 
 export const quotesAdminRoute = new Elysia({ prefix: "/admin" })
-	// only ADMIN keys
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.ADMIN }))
 
-	// Create quote
 	.post(
 		"/",
 		async ({ body }) => {
@@ -25,23 +24,22 @@ export const quotesAdminRoute = new Elysia({ prefix: "/admin" })
 				})
 				.returning();
 
-			return new Response(
-				JSON.stringify({ message: "Quote created", quote: created }),
-				{ status: 201, headers: { "Content-Type": "application/json" } },
-			);
+			return formatResponse({
+				body: { message: "Quote created", quote: created },
+				status: 201,
+			});
 		},
 		{ body: createQuoteSchema },
 	)
 
-	// Update quote
 	.put(
 		"/:id",
 		async ({ params, body }) => {
 			const id = Number(params.id);
 			if (Number.isNaN(id)) {
-				return new Response(JSON.stringify({ message: "Invalid quote ID" }), {
+				return formatResponse({
+					body: { message: "Invalid quote ID" },
 					status: 400,
-					headers: { "Content-Type": "application/json" },
 				});
 			}
 
@@ -51,9 +49,9 @@ export const quotesAdminRoute = new Elysia({ prefix: "/admin" })
 				.where(eq(quotes.id, id));
 
 			if (!existing) {
-				return new Response(JSON.stringify({ message: "Quote not found" }), {
+				return formatResponse({
+					body: { message: "Quote not found" },
 					status: 404,
-					headers: { "Content-Type": "application/json" },
 				});
 			}
 
@@ -69,23 +67,22 @@ export const quotesAdminRoute = new Elysia({ prefix: "/admin" })
 				.where(eq(quotes.id, id))
 				.returning();
 
-			return new Response(
-				JSON.stringify({ message: "Quote updated", quote: updated }),
-				{ status: 200, headers: { "Content-Type": "application/json" } },
-			);
+			return formatResponse({
+				body: { message: "Quote updated", quote: updated },
+				status: 200,
+			});
 		},
 		{ body: updateQuoteSchema, params: idParamSchema },
 	)
 
-	// Delete quote
 	.delete(
 		"/:id",
 		async ({ params }) => {
 			const id = Number(params.id);
 			if (Number.isNaN(id)) {
-				return new Response(JSON.stringify({ message: "Invalid quote ID" }), {
+				return formatResponse({
+					body: { message: "Invalid quote ID" },
 					status: 400,
-					headers: { "Content-Type": "application/json" },
 				});
 			}
 
@@ -95,15 +92,15 @@ export const quotesAdminRoute = new Elysia({ prefix: "/admin" })
 				.returning();
 
 			if (!deleted) {
-				return new Response(JSON.stringify({ message: "Quote not found" }), {
+				return formatResponse({
+					body: { message: "Quote not found" },
 					status: 404,
-					headers: { "Content-Type": "application/json" },
 				});
 			}
 
-			return new Response(JSON.stringify({ message: "Quote deleted" }), {
+			return formatResponse({
+				body: { message: "Quote deleted" },
 				status: 200,
-				headers: { "Content-Type": "application/json" },
 			});
 		},
 		{ params: idParamSchema },

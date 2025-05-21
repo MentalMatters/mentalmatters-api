@@ -1,5 +1,6 @@
 import Elysia from "elysia";
 import { v4 as uuid } from "uuid";
+import { formatResponse } from "@/utils"; // <-- import
 import { db } from "../../db";
 import { ApiKeyRole, apiKeys } from "../../db/schema";
 import { apiKeysAdminRoute } from "./admin";
@@ -22,17 +23,17 @@ export const apiKeysRoute = new Elysia({ prefix: "/api-key" })
 				})
 				.returning();
 
-			return new Response(
-				JSON.stringify({
+			return formatResponse({
+				body: {
 					message: "API key created",
 					apiKey: {
 						key: created.key,
 						role: created.role,
 						createdAt: created.createdAt,
 					},
-				}),
-				{ status: 201, headers: { "Content-Type": "application/json" } },
-			);
+				},
+				status: 201,
+			});
 		},
 		{
 			body: createApiKeySchema,
