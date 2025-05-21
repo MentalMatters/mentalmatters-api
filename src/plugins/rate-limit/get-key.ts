@@ -1,6 +1,6 @@
-import type { RateLimitKeyType } from "@/@types/plugins/rate-limit";
 import type { Context } from "elysia";
 import type { Server } from "elysia/dist/universal/server";
+import type { RateLimitKeyType } from "@/@types/plugins/rate-limit";
 
 export interface GetKeyOptions {
 	ctx: Context;

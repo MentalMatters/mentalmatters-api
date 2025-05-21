@@ -6,6 +6,7 @@ import type {
 	RateLimitPluginOptions,
 	RateLimitStore,
 } from "@/@types/plugins/rate-limit";
+import { formatResponse } from "@/utils"; // <-- import
 import { getKey } from "./get-key";
 import { MemoryFixedWindowStore } from "./stores/memory-fixed";
 import { MemorySlidingWindowStore } from "./stores/memory-sliding";
@@ -183,12 +184,13 @@ export function rateLimitPlugin<
 			if (blacklist.includes(id)) {
 				logDebug("[RateLimit] Blacklisted:", id);
 				if (onBlacklist) onBlacklist(ctx, id);
-				ctx.set.status = 429;
-				ctx.set.headers["Content-Type"] = "application/json";
-				return {
-					error: "Blacklisted",
-					message: blacklisted(ctx),
-				};
+				return formatResponse({
+					body: {
+						error: "Blacklisted",
+						message: blacklisted(ctx),
+					},
+					status: 429,
+				});
 			}
 
 			const key = `ratelimit:${routeKeyType}:${id}:${routeKey}:${method}`;
@@ -218,12 +220,13 @@ export function rateLimitPlugin<
 					);
 					return;
 				}
-				ctx.set.status = 503;
-				ctx.set.headers["Content-Type"] = "application/json";
-				return {
-					error: "RateLimitStoreUnavailable",
-					message: "Rate limit backend unavailable. Please try again later.",
-				};
+				return formatResponse({
+					body: {
+						error: "RateLimitStoreUnavailable",
+						message: "Rate limit backend unavailable. Please try again later.",
+					},
+					status: 503,
+				});
 			}
 
 			const remaining = Math.max(0, max - current);
@@ -251,12 +254,13 @@ export function rateLimitPlugin<
 					reset,
 				});
 				if (onLimitExceeded) onLimitExceeded(ctx, key, { current, max, reset });
-				ctx.set.status = 429;
-				ctx.set.headers["Content-Type"] = "application/json";
-				return {
-					error: "Too Many Requests",
-					message: limitExceeded(ctx, retryAfter),
-				};
+				return formatResponse({
+					body: {
+						error: "Too Many Requests",
+						message: limitExceeded(ctx, retryAfter),
+					},
+					status: 429,
+				});
 			}
 
 			logDebug("[RateLimit] Allowed:", {

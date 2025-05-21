@@ -1,5 +1,5 @@
-import type { RateLimitStore } from "@/@types/plugins/rate-limit";
 import type { Redis } from "ioredis";
+import type { RateLimitStore } from "@/@types/plugins/rate-limit";
 
 export class RedisSlidingWindowStore implements RateLimitStore {
 	constructor(private redis: Redis) {}

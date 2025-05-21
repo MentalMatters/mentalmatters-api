@@ -12,7 +12,8 @@
 			"!**/node_modules/**",
 			"!**/dist/**",
 			"!**/dist-ts/**",
-			"!**/dist-cjs/**"
+			"!**/dist-cjs/**",
+			"!**/drizzle/**"
 		]
 	},
 	"formatter": {
