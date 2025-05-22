@@ -15,16 +15,19 @@ const PORT = Number(process.env.PORT) || 5177;
 
 export let server: Server | null = null;
 
+const { RATE_LIMIT_HEADERS, RATE_LIMIT_VERBOSE } = Bun.env;
+
 export const app = new Elysia()
 	// Rate limiting plugin
 	.use(
 		rateLimitPlugin({
 			windowMs: 60_000, // 1 minute
 			max: 60,
-			headers: true,
-			verbose: true,
+			headers: RATE_LIMIT_HEADERS === "true",
+			verbose: RATE_LIMIT_VERBOSE === "true",
 			algorithm: "fixed-window",
 			message: "Too many requests, please try again later.",
+			skipIfAdmin: true,
 		}),
 	)
 

@@ -1,5 +1,8 @@
+import { eq } from "drizzle-orm";
 import Elysia from "elysia";
 import ms from "ms";
+import { db } from "@/db";
+import { apiKeys } from "@/db/schema";
 import { formatResponse } from "@/utils";
 import { buildSkipMatcher, createSkipEntryMatcher } from "./buildSkipMatcher";
 import type { RateLimitOptions, RateLimitStore } from "./types";
@@ -15,6 +18,8 @@ const DEFAULT_OPTIONS: RateLimitOptions = {
 	scope: "global",
 	algorithm: "fixed-window",
 	debug: false,
+	apiKeyHeaderName: "x-api-key",
+	skipIfAdmin: false,
 };
 
 type TokenBucketStore = Map<
@@ -85,9 +90,48 @@ export const rateLimitPlugin = (userOptions: RateLimitOptions = {}) => {
 		}
 	}
 
+	const apiKeyHeader = options.apiKeyHeaderName?.toLowerCase() ?? "x-api-key";
+
 	return new Elysia().onBeforeHandle(
 		{ as: options.scope },
-		({ request, set, path, server, status }) => {
+		({ request, set, path, server }) => {
+			const apiKeyValue = request.headers.get(apiKeyHeader);
+			let isAdminRequest = false;
+
+			if (options.skipIfAdmin) {
+				try {
+					if (!apiKeyValue) {
+						options.verbose &&
+							console.debug("Skipping rate-limit for non-admin request");
+						return;
+					}
+
+					const keyRecord = db
+						.select({ role: apiKeys.role, revoked: apiKeys.revoked })
+						.from(apiKeys)
+						.where(eq(apiKeys.key, apiKeyValue))
+						.get();
+
+					if (keyRecord && !keyRecord.revoked && keyRecord.role === "ADMIN") {
+						isAdminRequest = true;
+					}
+				} catch (dbError) {
+					console.error(
+						"Rate limiter: Database error during admin key check:",
+						dbError,
+					);
+				}
+			}
+
+			if (isAdminRequest) {
+				if (options.verbose) {
+					console.log(
+						`Admin key detected. Bypassing rate limit for ${request.method} ${request.url}.`,
+					);
+				}
+				return;
+			}
+
 			if (request.method === "OPTIONS") {
 				options.verbose && console.debug("Skipping rate-limit for OPTIONS");
 				return;

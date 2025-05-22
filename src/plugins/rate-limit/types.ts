@@ -44,4 +44,8 @@ export interface RateLimitOptions {
 	algorithm?: RateLimitAlgorithm;
 	/** Debug mode: disables/ enables the rate limit for testing */
 	debug?: boolean;
+	/** API key header name */
+	apiKeyHeaderName?: string;
+	/** Skip if user is admin */
+	skipIfAdmin?: boolean;
 }
