@@ -1,380 +1,265 @@
-import type { Context, Elysia } from "elysia";
-import type {
-	HTTPMethod,
-	PerMethodRateLimit,
-	RateLimitKeyType,
-	RateLimitPluginOptions,
-	RateLimitStore,
-	RouteRateLimitConfig,
-} from "@/@types/plugins/rate-limit";
+import Elysia from "elysia";
+import ms from "ms";
 import { formatResponse } from "@/utils";
-import { getKey } from "./get-key";
-import { MemoryFixedWindowStore } from "./stores/memory-fixed";
-import { MemorySlidingWindowStore } from "./stores/memory-sliding";
-import { MemoryTokenBucketStore } from "./stores/memory-token-bucket";
-import { RedisSlidingWindowStore } from "./stores/redis-sliding";
+import { buildSkipMatcher, createSkipEntryMatcher } from "./buildSkipMatcher";
+import type { RateLimitOptions, RateLimitStore } from "./types";
 
-// --- Type guard for per-method config ---
-function isPerMethodRateLimit(obj: unknown): obj is PerMethodRateLimit {
-	if (!obj || typeof obj !== "object") return false;
-	const methodKeys = [
-		"GET",
-		"POST",
-		"PUT",
-		"DELETE",
-		"PATCH",
-		"OPTIONS",
-		"HEAD",
-	];
-	return methodKeys.some((k) => k in obj);
-}
+const DEFAULT_OPTIONS: RateLimitOptions = {
+	windowMs: 60_000,
+	max: 10,
+	message: "Too many requests, please try again later.",
+	statusCode: 429,
+	skipPaths: [],
+	verbose: true,
+	headers: true,
+	scope: "global",
+	algorithm: "fixed-window",
+	debug: false,
+};
 
-// Helper: Get exactRouteMatch from config (per-route or per-method)
-function getRouteExactMatch(
-	routeConfig: RouteRateLimitConfig | PerMethodRateLimit,
-	method: HTTPMethod,
-): boolean {
-	if (isPerMethodRateLimit(routeConfig) && method in routeConfig) {
-		const methodConfig = (routeConfig as PerMethodRateLimit)[method];
-		if (
-			methodConfig &&
-			typeof methodConfig === "object" &&
-			"exactRouteMatch" in methodConfig
-		) {
-			return !!methodConfig.exactRouteMatch;
+type TokenBucketStore = Map<
+	string,
+	{ tokens: number; lastRefill: number; lastRequest: number }
+>;
+
+type SlidingWindowStore = Map<
+	string,
+	{ requests: number[]; lastRequest: number }
+>;
+
+const getClientIdentifier = (
+	request: Request,
+	server: any,
+	keyGenerator?: (req: Request, srv: any) => string,
+): string => {
+	try {
+		if (keyGenerator) {
+			const key = keyGenerator(request, server);
+			return typeof key === "string" ? key : "unknown";
 		}
-	}
-	if (
-		routeConfig &&
-		typeof routeConfig === "object" &&
-		"exactRouteMatch" in routeConfig
-	) {
-		return !!routeConfig.exactRouteMatch;
-	}
-	return false; // default: prefix match
-}
 
-function normalizePath(path: string): string {
-	// Remove trailing slash unless it's the root "/"
-	return path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
-}
+		let ip =
+			request.headers.get("x-forwarded-for") ||
+			request.headers.get("x-real-ip") ||
+			server?.requestIP?.(request) ||
+			"unknown";
 
-// Helper: Find route config by exact or prefix match, per-route/per-method
-function findRouteConfig(
-	routes: Record<string, RouteRateLimitConfig | PerMethodRateLimit>,
-	routeKey: string,
-	method: HTTPMethod,
-): {
-	config: RouteRateLimitConfig | PerMethodRateLimit | undefined;
-	matchedKey: string | null;
-} {
-	let matchedKey: string | null = null;
-	let matchedConfig: RouteRateLimitConfig | PerMethodRateLimit | undefined;
-	let longestPrefix = -1;
-
-	const normalizedRouteKey = normalizePath(routeKey);
-
-	for (const key in routes) {
-		const config = routes[key];
-		const exact = getRouteExactMatch(config, method);
-		const normalizedKey = normalizePath(key);
-
-		if (exact) {
-			if (normalizedRouteKey === normalizedKey) {
-				if (normalizedKey.length > longestPrefix) {
-					matchedKey = key;
-					matchedConfig = config;
-					longestPrefix = normalizedKey.length;
-				}
-			}
-		} else {
-			if (
-				normalizedRouteKey === normalizedKey ||
-				normalizedRouteKey.startsWith(`${normalizedKey}/`)
-			) {
-				if (normalizedKey.length > longestPrefix) {
-					matchedKey = key;
-					matchedConfig = config;
-					longestPrefix = normalizedKey.length;
-				}
-			}
+		if (ip && typeof ip === "object" && "address" in ip) {
+			ip = ip.address;
 		}
+
+		if (typeof ip === "string") {
+			ip = ip.replace(/^::1$/, "localhost");
+			if (ip.includes(",")) {
+				ip = ip.split(",")[0].trim();
+			}
+			return ip;
+		}
+
+		return "unknown";
+	} catch (err) {
+		console.error(
+			`Error extracting IP: ${err instanceof Error ? err.message : String(err)}`,
+		);
+		return "unknown";
 	}
-	return { config: matchedConfig, matchedKey };
-}
+};
 
-export function rateLimitPlugin<
-	TErrorBody = { error: string; message: string },
->(options: RateLimitPluginOptions<TErrorBody> = {}) {
-	let global = options.global ?? { windowMs: 60_000, max: 60 };
-	let routes = options.routes ?? {};
-	let whitelist = options.whitelist ?? [];
-	let blacklist = options.blacklist ?? [];
-	const getServer = options.getServer ?? (() => null);
+export const rateLimitPlugin = (userOptions: RateLimitOptions = {}) => {
+	const options = { ...DEFAULT_OPTIONS, ...userOptions };
 
-	const debug = options.debug ?? false;
-	const logDebug = (...args: unknown[]) => {
-		if (debug) console.debug(...args);
-	};
-
-	const {
-		keyType = "ip",
-		getId,
-		extractKey,
-		store,
-		algorithm = "sliding-window",
-		headers = {
-			enabled: true,
-			names: {
-				limit: "X-RateLimit-Limit",
-				remaining: "X-RateLimit-Remaining",
-				reset: "X-RateLimit-Reset",
-				retryAfter: "Retry-After",
-			},
-		},
-		onLimitExceeded,
-		onWhitelist,
-		onBlacklist,
-		failOpen = true,
-		messages,
-	} = options;
-
-	const limitExceeded =
-		messages?.limitExceeded ??
-		((_ctx: Context, retryAfter: number) =>
-			`Rate limit exceeded. Try again in ${Math.ceil(
-				retryAfter / 1000,
-			)} seconds.`);
-
-	const blacklisted =
-		messages?.blacklisted ??
-		(() => "You are not allowed to access this resource.");
-
-	function setGlobal(newGlobal: typeof global) {
-		global = newGlobal;
-		logDebug("[RateLimit] Global config updated:", global);
-	}
-	function setRoutes(newRoutes: typeof routes) {
-		routes = newRoutes;
-		logDebug("[RateLimit] Routes config updated:", routes);
-	}
-	function setWhitelist(newWhitelist: typeof whitelist) {
-		whitelist = newWhitelist;
-		logDebug("[RateLimit] Whitelist updated:", whitelist);
-	}
-	function setBlacklist(newBlacklist: typeof blacklist) {
-		blacklist = newBlacklist;
-		logDebug("[RateLimit] Blacklist updated:", blacklist);
-	}
-
-	let selectedStore: RateLimitStore;
-	if (store) {
-		selectedStore = store;
-		logDebug("[RateLimit] Using custom store");
+	let ipRequests: RateLimitStore | TokenBucketStore | SlidingWindowStore;
+	if (options.store) {
+		ipRequests = options.store;
 	} else {
-		switch (algorithm) {
-			case "fixed-window":
-				selectedStore = new MemoryFixedWindowStore();
-				break;
+		switch (options.algorithm) {
 			case "token-bucket":
-				selectedStore = new MemoryTokenBucketStore();
+				ipRequests = new Map() as TokenBucketStore;
+				break;
+			case "sliding-window":
+				ipRequests = new Map() as SlidingWindowStore;
 				break;
 			default:
-				selectedStore = new MemorySlidingWindowStore();
+				ipRequests = new Map() as RateLimitStore;
 				break;
 		}
-		logDebug(`[RateLimit] Using algorithm: ${algorithm}`);
 	}
 
-	const plugin = (app: Elysia) => {
-		app.onBeforeHandle(async (ctx: Context) => {
-			let routeKey: string;
-			if (
-				typeof ctx.route === "object" &&
-				ctx.route &&
-				"path" in ctx.route &&
-				typeof (ctx.route as { path?: string }).path === "string"
-			) {
-				routeKey = (ctx.route as { path: string }).path;
-			} else {
-				routeKey = ctx.path;
+	return new Elysia().onBeforeHandle(
+		{ as: options.scope },
+		({ request, set, path, server, status }) => {
+			if (request.method === "OPTIONS") {
+				options.verbose && console.debug("Skipping rate-limit for OPTIONS");
+				return;
 			}
 
-			const method = ctx.request.method as HTTPMethod;
-			const { config: routeConfig, matchedKey } = findRouteConfig(
-				routes,
-				routeKey,
-				method,
-			);
+			if (options.debug) {
+				options.verbose && console.debug("Debug mode: skipping rate-limit");
+				return;
+			}
 
-			let windowMs = global.windowMs;
-			let max = global.max;
-			let routeKeyType = keyType;
+			const shouldSkip = buildSkipMatcher(options.skipPaths);
 
-			if (routeConfig) {
-				if (isPerMethodRateLimit(routeConfig) && method in routeConfig) {
-					const methodConfig = (routeConfig as PerMethodRateLimit)[method];
-					if (methodConfig) {
-						windowMs = methodConfig.windowMs ?? windowMs;
-						max = methodConfig.max ?? max;
-						routeKeyType = methodConfig.keyType ?? routeKeyType;
+			if (shouldSkip(path)) {
+				options.verbose &&
+					console.debug(`Skipping rate-limit for path: ${path}`);
+				return;
+			}
+
+			const method = request.method ?? "GET";
+			let tierMax = options.max ?? 10;
+			let tierWindow = options.windowMs ?? 60_000;
+
+			if (options.tiers) {
+				for (const tier of options.tiers) {
+					const tierShouldApply = createSkipEntryMatcher(tier.path);
+					if (
+						tierShouldApply(path) &&
+						(!tier.method || tier.method === "ALL" || tier.method === method)
+					) {
+						tierMax = tier.max ?? tierMax;
+						tierWindow = tier.windowMs ?? tierWindow;
+						options.verbose &&
+							console.debug(
+								`Applying tier for ${path}: max=${tierMax}, window=${ms(
+									tierWindow,
+								)}`,
+							);
+						break;
 					}
-				} else {
-					windowMs =
-						(routeConfig as { windowMs?: number }).windowMs ?? windowMs;
-					max = (routeConfig as { max?: number }).max ?? max;
-					routeKeyType =
-						(routeConfig as { keyType?: RateLimitKeyType }).keyType ??
-						routeKeyType;
 				}
 			}
 
-			logDebug(
-				"[RateLimit] Route:",
-				routeKey,
-				"Method:",
-				method,
-				"windowMs:",
-				windowMs,
-				"max:",
-				max,
-				"keyType:",
-				routeKeyType,
+			const clientId = getClientIdentifier(
+				request,
+				server,
+				options.keyGenerator,
 			);
+			const now = Date.now();
+			let isRateLimited = false;
+			let remaining = 0;
+			let resetTime = 0;
 
-			const id = getKey({
-				ctx,
-				keyType: routeKeyType,
-				getId,
-				extractKey,
-				server: getServer(),
-				debug,
-			});
-			logDebug("[RateLimit] Extracted key:", id);
-
-			if (!id) {
-				logDebug("[RateLimit] No key extracted, skipping rate limit.");
-				return;
-			}
-
-			if (whitelist.includes(id)) {
-				logDebug("[RateLimit] Whitelisted:", id);
-				if (onWhitelist) onWhitelist(ctx, id);
-				return;
-			}
-			if (blacklist.includes(id)) {
-				logDebug("[RateLimit] Blacklisted:", id);
-				if (onBlacklist) onBlacklist(ctx, id);
-				return formatResponse({
-					body: {
-						error: "Blacklisted",
-						message: blacklisted(ctx),
-					},
-					status: 429,
-				});
-			}
-
-			const key = `ratelimit:${routeKeyType}:${id}:${matchedKey ?? routeKey}:${method}`;
-			logDebug("[RateLimit] Store key:", key);
-
-			let current: number;
-			let reset: number;
-			try {
-				if (
-					algorithm === "token-bucket" &&
-					selectedStore instanceof MemoryTokenBucketStore
-				) {
-					const result = await selectedStore.incr(key, windowMs, max);
-					current = result.current;
-					reset = result.reset;
-				} else {
-					const result = await selectedStore.incr(key, windowMs);
-					current = result.current;
-					reset = result.reset;
+			switch (options.algorithm) {
+				case "token-bucket": {
+					const store = ipRequests as TokenBucketStore;
+					if (!store.has(clientId)) {
+						store.set(clientId, {
+							tokens: tierMax,
+							lastRefill: now,
+							lastRequest: now,
+						});
+						remaining = tierMax - 1;
+						resetTime = now + tierWindow;
+						break;
+					}
+					// biome-ignore lint/style/noNonNullAssertion: we know this is not null
+					const bucket = store.get(clientId)!;
+					const elapsed = now - bucket.lastRefill;
+					const rate = tierMax / tierWindow;
+					const refill = Math.floor(elapsed * rate);
+					if (refill > 0) {
+						bucket.tokens = Math.min(tierMax, bucket.tokens + refill);
+						bucket.lastRefill = now;
+					}
+					if (bucket.tokens > 0) {
+						bucket.tokens--;
+						remaining = bucket.tokens;
+						resetTime = now + Math.ceil(1 / rate);
+					} else {
+						remaining = 0;
+						resetTime = bucket.lastRefill + Math.ceil(1 / rate);
+						isRateLimited = true;
+					}
+					bucket.lastRequest = now;
+					break;
 				}
-				logDebug("[RateLimit] Store result:", { current, reset });
-			} catch (err) {
-				console.error("[RateLimit] Store error:", err);
-				if (failOpen) {
-					console.warn(
-						"[RateLimit] Store failed, failOpen=true, allowing request.",
+				case "sliding-window": {
+					const store = ipRequests as SlidingWindowStore;
+					if (!store.has(clientId)) {
+						store.set(clientId, { requests: [now], lastRequest: now });
+						remaining = tierMax - 1;
+						resetTime = now + tierWindow;
+						break;
+					}
+					// biome-ignore lint/style/noNonNullAssertion: we know this is not null
+					const info = store.get(clientId)!;
+					const windowStart = now - tierWindow;
+					info.requests = info.requests.filter((t) => t >= windowStart);
+					if (info.requests.length < tierMax) {
+						info.requests.push(now);
+						remaining = tierMax - info.requests.length;
+						resetTime = info.requests[0] + tierWindow;
+						info.lastRequest = now;
+					} else {
+						remaining = 0;
+						resetTime = info.requests[0] + tierWindow;
+						isRateLimited = true;
+					}
+					break;
+				}
+				default: {
+					const store = ipRequests as RateLimitStore;
+					if (!store.has(clientId)) {
+						store.set(clientId, { count: 1, lastRequest: now });
+						remaining = tierMax - 1;
+						resetTime = now + tierWindow;
+						break;
+					}
+					// biome-ignore lint/style/noNonNullAssertion: we know this is not null
+					const info = store.get(clientId)!;
+					if (now - info.lastRequest > tierWindow) {
+						info.count = 1;
+						info.lastRequest = now;
+						remaining = tierMax - 1;
+						resetTime = now + tierWindow;
+					} else {
+						info.count++;
+						if (info.count <= tierMax) {
+							remaining = tierMax - info.count;
+							resetTime = info.lastRequest + tierWindow;
+						} else {
+							remaining = 0;
+							resetTime = info.lastRequest + tierWindow;
+							isRateLimited = true;
+						}
+					}
+					break;
+				}
+			}
+
+			if (!isRateLimited) {
+				if (options.headers) {
+					set.headers["X-RateLimit-Limit"] = String(tierMax);
+					set.headers["X-RateLimit-Remaining"] = String(remaining);
+					set.headers["X-RateLimit-Reset"] = String(
+						Math.ceil(resetTime / 1000),
 					);
-					return;
 				}
-				return formatResponse({
-					body: {
-						error: "RateLimitStoreUnavailable",
-						message: "Rate limit backend unavailable. Please try again later.",
-					},
-					status: 503,
-				});
+				return;
 			}
 
-			const remaining = Math.max(0, max - current);
-			const retryAfter = reset - Date.now();
+			options.verbose && console.debug(`Rate limit exceeded for ${clientId}`);
 
-			if (headers.enabled && headers.names) {
-				ctx.set.headers[headers.names.limit ?? "X-RateLimit-Limit"] =
-					String(max);
-				ctx.set.headers[headers.names.remaining ?? "X-RateLimit-Remaining"] =
-					String(remaining);
-				ctx.set.headers[headers.names.reset ?? "X-RateLimit-Reset"] = String(
-					Math.floor(reset / 1000),
+			if (options.headers) {
+				set.headers["X-RateLimit-Limit"] = String(tierMax);
+				set.headers["X-RateLimit-Remaining"] = "0";
+				set.headers["X-RateLimit-Reset"] = String(Math.ceil(resetTime / 1000));
+				set.headers["Retry-After"] = String(
+					Math.ceil((resetTime - now) / 1000),
 				);
-				if (current > max) {
-					ctx.set.headers[headers.names.retryAfter ?? "Retry-After"] = String(
-						Math.ceil(retryAfter / 1000),
-					);
-				}
 			}
 
-			if (current > max) {
-				logDebug("[RateLimit] Limit exceeded for key:", key, {
-					current,
-					max,
-					reset,
-				});
-				if (onLimitExceeded) onLimitExceeded(ctx, key, { current, max, reset });
-				return formatResponse({
-					body: {
-						error: "Too Many Requests",
-						message: limitExceeded(ctx, retryAfter),
-					},
-					status: 429,
-				});
-			}
-
-			logDebug("[RateLimit] Allowed:", {
-				key,
-				current,
-				max,
-				remaining,
-				reset,
+			return formatResponse({
+				body: {
+					message: options.message,
+					retryAfter: Math.ceil((resetTime - now) / 1000),
+					resetTime: ms(resetTime - now, {
+						long: true,
+					}),
+				},
+				status: options.statusCode,
 			});
-		});
-
-		app.decorate("rateLimitStore", selectedStore);
-		app.decorate("setRateLimitGlobal", setGlobal);
-		app.decorate("setRateLimitRoutes", setRoutes);
-		app.decorate("setRateLimitWhitelist", setWhitelist);
-		app.decorate("setRateLimitBlacklist", setBlacklist);
-
-		return app;
-	};
-
-	Object.assign(plugin, {
-		setGlobal,
-		setRoutes,
-		setWhitelist,
-		setBlacklist,
-	});
-
-	return plugin;
-}
-
-export {
-	MemorySlidingWindowStore,
-	MemoryFixedWindowStore,
-	MemoryTokenBucketStore,
-	RedisSlidingWindowStore,
+		},
+	);
 };

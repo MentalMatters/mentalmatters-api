@@ -19,31 +19,12 @@ export const app = new Elysia()
 	// Rate limiting plugin
 	.use(
 		rateLimitPlugin({
+			windowMs: 60_000, // 1 minute
+			max: 60,
+			headers: true,
+			verbose: true,
 			algorithm: "fixed-window",
-			getServer: () => server,
-			routes: {
-				"/affirmations/": {
-					POST: { max: 1, windowMs: 1_800_000, exactRouteMatch: false },
-				}, // 30 minutes
-				"/languages/": {
-					POST: { max: 1, windowMs: 1_800_000, exactRouteMatch: false },
-				},
-				"/moods/": {
-					POST: { max: 1, windowMs: 1_800_000, exactRouteMatch: false },
-				},
-				"/quotes/": {
-					POST: { max: 1, windowMs: 1_800_000, exactRouteMatch: false },
-				},
-				"/resources/": {
-					POST: { max: 1, windowMs: 1_800_000, exactRouteMatch: false },
-				},
-				"/tags/": {
-					POST: { max: 1, windowMs: 1_800_000, exactRouteMatch: false },
-				},
-				"/api-key/": {
-					POST: { max: 1, windowMs: 10_800_000, exactRouteMatch: false },
-				}, // 3 hours
-			},
+			message: "Too many requests, please try again later.",
 		}),
 	)
 
