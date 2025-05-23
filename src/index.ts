@@ -85,11 +85,12 @@ export const app = new Elysia()
 	// Root route
 	.get(
 		"/",
-		() =>
+		(ctx) =>
 			formatResponse({
 				body: {
 					message:
 						"Hello, friend! Remember, you matter and support is always here for you. Take care.",
+					docs: `${ctx.request.url}docs`,
 					github: "https://github.com/mentalmatters/mentalmatters-api",
 				},
 				status: 200,
