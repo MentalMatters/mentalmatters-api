@@ -36,7 +36,15 @@ export const languagesRoute = new Elysia({ prefix: "/languages" })
 				status: 200,
 			});
 		},
-		{ query: getLanguagesSchema },
+		{
+			query: getLanguagesSchema,
+			detail: {
+				tags: ["Languages"],
+				summary: "Get all languages",
+				description:
+					"Retrieve a list of all supported languages with optional filtering by code or name",
+			},
+		},
 	)
 
 	.get(
@@ -67,6 +75,13 @@ export const languagesRoute = new Elysia({ prefix: "/languages" })
 				status: 200,
 			});
 		},
-		{ params: codeParamSchema },
+		{
+			params: codeParamSchema,
+			detail: {
+				tags: ["Languages"],
+				summary: "Get language by code",
+				description: "Retrieve a specific language by its ISO code",
+			},
+		},
 	)
 	.use(languagesAdminRoute);

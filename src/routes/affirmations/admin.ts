@@ -17,6 +17,18 @@ import {
 
 const idParamSchema = t.Object({ id: t.String() });
 
+const affirmationResponseSchema = t.Object({
+	message: t.String(),
+	affirmation: t.Optional(
+		t.Object({
+			id: t.Number(),
+			text: t.String(),
+			category: t.Optional(t.String()),
+			language: t.Optional(t.String()),
+		}),
+	),
+});
+
 export const affirmationsAdminRoute = new Elysia({ prefix: "/admin" })
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.ADMIN }))
 
@@ -79,7 +91,15 @@ export const affirmationsAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 201,
 			});
 		},
-		{ body: createAffirmationSchema },
+		{
+			body: createAffirmationSchema,
+			detail: {
+				tags: ["Affirmations"],
+				summary: "Create a new affirmation",
+				operationId: "createAffirmation",
+				description: "Creates a new affirmation entry with optional tags.",
+			},
+		},
 	)
 
 	// Update affirmation
@@ -128,7 +148,17 @@ export const affirmationsAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 200,
 			});
 		},
-		{ body: updateAffirmationSchema, params: idParamSchema },
+		{
+			body: updateAffirmationSchema,
+			params: idParamSchema,
+			detail: {
+				tags: ["Affirmations"],
+				summary: "Update an existing affirmation",
+				operationId: "updateAffirmation",
+				description:
+					"Updates text, category, or language for an existing affirmation by ID.",
+			},
+		},
 	)
 
 	// Delete affirmation
@@ -158,7 +188,15 @@ export const affirmationsAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 200,
 			});
 		},
-		{ params: idParamSchema },
+		{
+			params: idParamSchema,
+			detail: {
+				tags: ["Affirmations"],
+				summary: "Delete an affirmation",
+				operationId: "deleteAffirmation",
+				description: "Deletes an affirmation by its ID.",
+			},
+		},
 	)
 
 	// Approve / unapprove
@@ -195,5 +233,15 @@ export const affirmationsAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 200,
 			});
 		},
-		{ body: approveAffirmationSchema, params: idParamSchema },
+		{
+			body: approveAffirmationSchema,
+			params: idParamSchema,
+			detail: {
+				tags: ["Affirmations"],
+				summary: "Approve or unapprove an affirmation",
+				operationId: "toggleAffirmationApproval",
+				description:
+					"Sets an affirmation's approval status and optionally updates its approval date.",
+			},
+		},
 	);

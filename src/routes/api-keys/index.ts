@@ -37,6 +37,17 @@ export const apiKeysRoute = new Elysia({ prefix: "/api-key" })
 		},
 		{
 			body: createApiKeySchema,
+			detail: {
+				tags: ["API Keys"],
+				summary: "Create new API key",
+				description:
+					"Generate a new API key for accessing the Mental Matters API",
+				responses: {
+					201: {
+						description: "API key created successfully",
+					},
+				},
+			},
 		},
 	)
 	.use(apiKeyMeRoute)

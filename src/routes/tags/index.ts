@@ -26,7 +26,16 @@ export const tagsRoute = new Elysia({ prefix: "/tags" })
 				status: 200,
 			});
 		},
-		{ query: getTagsSchema },
+		{
+			query: getTagsSchema,
+			detail: {
+				tags: ["Tags"],
+				summary: "Get all tags",
+				operationId: "getAllTags",
+				description:
+					"Retrieve a list of all tags with optional filtering by name",
+			},
+		},
 	)
 
 	.get(
@@ -54,6 +63,14 @@ export const tagsRoute = new Elysia({ prefix: "/tags" })
 				status: 200,
 			});
 		},
-		{ params: idParamSchema },
+		{
+			params: idParamSchema,
+			detail: {
+				tags: ["Tags"],
+				summary: "Get a tag by ID",
+				operationId: "getTagById",
+				description: "Retrieve a specific tag by its unique identifier",
+			},
+		},
 	)
 	.use(tagsAdminRoute);

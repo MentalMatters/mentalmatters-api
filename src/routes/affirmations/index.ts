@@ -64,7 +64,15 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 				status: 200,
 			});
 		},
-		{ query: getAffirmationsSchema },
+		{
+			query: getAffirmationsSchema,
+			detail: {
+				tags: ["Affirmations"],
+				summary: "Get all affirmations",
+				description:
+					"Retrieve a list of all approved affirmations with their associated tags",
+			},
+		},
 	)
 
 	.get(
@@ -115,7 +123,14 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 				status: 200,
 			});
 		},
-		{ params: idParamSchema },
+		{
+			params: idParamSchema,
+			detail: {
+				tags: ["Affirmations"],
+				summary: "Get affirmation by ID",
+				description: "Retrieve a specific affirmation by its unique identifier",
+			},
+		},
 	)
 
 	.post(
@@ -178,6 +193,15 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 				status: 201,
 			});
 		},
-		{ body: createAffirmationSchema },
+		{
+			body: createAffirmationSchema,
+			detail: {
+				tags: ["Affirmations"],
+				summary: "Create new affirmation",
+				operationId: "createAffirmationRequest",
+				description:
+					"Submit a new affirmation for approval. When submitted by a regular user, the affirmation will require admin approval before becoming visible.",
+			},
+		},
 	)
 	.use(affirmationsAdminRoute);

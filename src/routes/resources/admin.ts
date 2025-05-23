@@ -33,7 +33,14 @@ export const resourcesAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 201,
 			});
 		},
-		{ body: createResourceSchema },
+		{
+			body: createResourceSchema,
+			detail: {
+				tags: ["Admin", "Resources"],
+				summary: "Create a new resource",
+				description: "Create a new resource",
+			},
+		},
 	)
 
 	.put(
@@ -79,7 +86,15 @@ export const resourcesAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 200,
 			});
 		},
-		{ body: updateResourceSchema, params: idParamSchema },
+		{
+			body: updateResourceSchema,
+			params: idParamSchema,
+			detail: {
+				tags: ["Admin", "Resources"],
+				summary: "Update a resource",
+				description: "Update a resource",
+			},
+		},
 	)
 
 	.delete(
@@ -110,5 +125,12 @@ export const resourcesAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 200,
 			});
 		},
-		{ params: idParamSchema },
+		{
+			params: idParamSchema,
+			detail: {
+				tags: ["Admin", "Resources"],
+				summary: "Delete a resource",
+				description: "Delete a resource",
+			},
+		},
 	);

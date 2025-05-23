@@ -11,6 +11,37 @@ const idParamSchema = t.Object({ id: t.String() });
 export const moodsAdminRoute = new Elysia({ prefix: "/admin" })
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.ADMIN }))
 
+	.post(
+		"/",
+		async ({ body }) => {
+			const [created] = await db
+				.insert(moods)
+				.values({
+					name: body.name,
+					description: body.description,
+					language: body.language,
+					emoji: body.emoji,
+				})
+				.returning();
+
+			return formatResponse({
+				body: {
+					message: "Mood created successfully",
+					mood: created,
+				},
+				status: 201,
+			});
+		},
+		{
+			body: createMoodSchema,
+			detail: {
+				tags: ["Moods"],
+				summary: "Create a new mood (Admin)",
+				description: "Create a new mood entry (requires admin privileges)",
+			},
+		},
+	)
+
 	.put(
 		"/:id",
 		async ({ params, body }) => {
@@ -22,36 +53,42 @@ export const moodsAdminRoute = new Elysia({ prefix: "/admin" })
 				});
 			}
 
-			const [existing] = await db.select().from(moods).where(eq(moods.id, id));
+			const [updated] = await db
+				.update(moods)
+				.set({
+					name: body.name,
+					description: body.description,
+					language: body.language,
+					emoji: body.emoji,
+				})
+				.where(eq(moods.id, id))
+				.returning();
 
-			if (!existing) {
+			if (!updated) {
 				return formatResponse({
 					body: { message: "Mood not found" },
 					status: 404,
 				});
 			}
 
-			const [updated] = await db
-				.update(moods)
-				.set({
-					name: body.name ?? existing.name,
-					description: body.description ?? existing.description,
-					emoji: body.emoji ?? existing.emoji,
-					language: body.language ?? existing.language,
-					updatedAt: new Date(),
-				})
-				.where(eq(moods.id, id))
-				.returning();
-
 			return formatResponse({
 				body: {
-					message: "Mood updated",
+					message: "Mood updated successfully",
 					mood: updated,
 				},
 				status: 200,
 			});
 		},
-		{ body: updateMoodSchema, params: idParamSchema },
+		{
+			params: idParamSchema,
+			body: updateMoodSchema,
+			detail: {
+				tags: ["Moods"],
+				summary: "Update a mood (Admin)",
+				description:
+					"Update an existing mood entry (requires admin privileges)",
+			},
+		},
 	)
 
 	.delete(
@@ -78,33 +115,19 @@ export const moodsAdminRoute = new Elysia({ prefix: "/admin" })
 			}
 
 			return formatResponse({
-				body: { message: "Mood deleted" },
+				body: {
+					message: "Mood deleted successfully",
+				},
 				status: 200,
 			});
 		},
-		{ params: idParamSchema },
-	)
-
-	.post(
-		"/",
-		async ({ body }) => {
-			const [createdMood] = await db
-				.insert(moods)
-				.values({
-					name: body.name,
-					description: body.description,
-					emoji: body.emoji,
-					language: body.language,
-				})
-				.returning();
-
-			return formatResponse({
-				body: {
-					message: "Mood created",
-					mood: createdMood,
-				},
-				status: 201,
-			});
+		{
+			params: idParamSchema,
+			detail: {
+				tags: ["Moods"],
+				summary: "Delete a mood (Admin)",
+				description:
+					"Delete an existing mood entry (requires admin privileges)",
+			},
 		},
-		{ body: createMoodSchema },
 	);

@@ -42,7 +42,15 @@ export const languagesAdminRoute = new Elysia({ prefix: "/admin" })
 				});
 			}
 		},
-		{ body: createLanguageSchema },
+		{
+			body: createLanguageSchema,
+			detail: {
+				tags: ["Admin", "Languages"],
+				summary: "Create a language",
+				operationId: "createLanguage",
+				description: "Creates a new language entry with ISO code and name",
+			},
+		},
 	)
 
 	.put(
@@ -84,7 +92,16 @@ export const languagesAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 200,
 			});
 		},
-		{ body: updateLanguageSchema, params: codeParamSchema },
+		{
+			body: updateLanguageSchema,
+			params: codeParamSchema,
+			detail: {
+				tags: ["Admin", "Languages"],
+				summary: "Update a language",
+				operationId: "updateLanguage",
+				description: "Updates an existing language's name by its ISO code",
+			},
+		},
 	)
 
 	.delete(
@@ -115,5 +132,14 @@ export const languagesAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 200,
 			});
 		},
-		{ params: codeParamSchema },
+		{
+			params: codeParamSchema,
+			detail: {
+				tags: ["Admin", "Languages"],
+				summary: "Delete a language",
+				operationId: "deleteLanguage",
+				description:
+					"Permanently removes a language from the database by its ISO code",
+			},
+		},
 	);

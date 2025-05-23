@@ -42,7 +42,15 @@ export const tagsAdminRoute = new Elysia({ prefix: "/admin" })
 				});
 			}
 		},
-		{ body: createTagSchema },
+		{
+			body: createTagSchema,
+			detail: {
+				tags: ["Admin", "Tags"],
+				summary: "Create a tag",
+				operationId: "createTag",
+				description: "Creates a new tag for categorizing content",
+			},
+		},
 	)
 
 	.put(
@@ -81,7 +89,16 @@ export const tagsAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 200,
 			});
 		},
-		{ body: updateTagSchema, params: idParamSchema },
+		{
+			body: updateTagSchema,
+			params: idParamSchema,
+			detail: {
+				tags: ["Admin", "Tags"],
+				summary: "Update a tag",
+				operationId: "updateTag",
+				description: "Updates an existing tag's name by its ID",
+			},
+		},
 	)
 
 	.delete(
@@ -112,5 +129,13 @@ export const tagsAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 200,
 			});
 		},
-		{ params: idParamSchema },
+		{
+			params: idParamSchema,
+			detail: {
+				tags: ["Admin", "Tags"],
+				summary: "Delete a tag",
+				operationId: "deleteTag",
+				description: "Permanently removes a tag from the database by its ID",
+			},
+		},
 	);

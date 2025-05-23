@@ -8,7 +8,16 @@ import { createQuoteSchema, updateQuoteSchema } from "./schema";
 
 const idParamSchema = t.Object({ id: t.String() });
 
-export const quotesAdminRoute = new Elysia({ prefix: "/admin" })
+export const quotesAdminRoute = new Elysia({
+	prefix: "/admin",
+	detail: {
+		security: [
+			{
+				"x-api-key": [],
+			},
+		],
+	},
+})
 	.use(apiKeyPlugin({ requiredRole: ApiKeyRole.ADMIN }))
 
 	.post(
@@ -29,7 +38,16 @@ export const quotesAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 201,
 			});
 		},
-		{ body: createQuoteSchema },
+		{
+			body: createQuoteSchema,
+			detail: {
+				tags: ["Admin", "Quotes"],
+				summary: "Create a new quote",
+				operationId: "createQuote",
+				description:
+					"Creates a new inspirational quote with author, category, and language information",
+			},
+		},
 	)
 
 	.put(
@@ -72,7 +90,17 @@ export const quotesAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 200,
 			});
 		},
-		{ body: updateQuoteSchema, params: idParamSchema },
+		{
+			body: updateQuoteSchema,
+			params: idParamSchema,
+			detail: {
+				tags: ["Admin", "Quotes"],
+				summary: "Update a quote",
+				operationId: "updateQuote",
+				description:
+					"Updates an existing quote's text, author, category, or language by its ID",
+			},
+		},
 	)
 
 	.delete(
@@ -103,5 +131,13 @@ export const quotesAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 200,
 			});
 		},
-		{ params: idParamSchema },
+		{
+			params: idParamSchema,
+			detail: {
+				tags: ["Admin", "Quotes"],
+				summary: "Delete a quote",
+				operationId: "deleteQuote",
+				description: "Permanently removes a quote from the database by its ID",
+			},
+		},
 	);

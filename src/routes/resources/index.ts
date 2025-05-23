@@ -30,7 +30,14 @@ export const resourcesRoute = new Elysia({ prefix: "/resources" })
 				status: 200,
 			});
 		},
-		{ query: getResourcesSchema },
+		{
+			query: getResourcesSchema,
+			detail: {
+				tags: ["Resources"],
+				summary: "Get all resources",
+				description: "Get all resources",
+			},
+		},
 	)
 
 	.get(
@@ -61,6 +68,14 @@ export const resourcesRoute = new Elysia({ prefix: "/resources" })
 				status: 200,
 			});
 		},
-		{ params: idParamSchema },
+		{
+			params: idParamSchema,
+			detail: {
+				tags: ["Resources"],
+				summary: "Get resource by ID",
+				description:
+					"Retrieve a specific mental health resource by its unique identifier",
+			},
+		},
 	)
 	.use(resourcesAdminRoute);

@@ -29,7 +29,15 @@ export const moodsRoute = new Elysia({ prefix: "/moods" })
 				status: 200,
 			});
 		},
-		{ query: getMoodsSchema },
+		{
+			query: getMoodsSchema,
+			detail: {
+				tags: ["Moods"],
+				summary: "Get all moods",
+				description:
+					"Retrieve a list of all moods with optional language filtering",
+			},
+		},
 	)
 
 	.get(
@@ -57,6 +65,13 @@ export const moodsRoute = new Elysia({ prefix: "/moods" })
 				status: 200,
 			});
 		},
-		{ params: idParamSchema },
+		{
+			params: idParamSchema,
+			detail: {
+				tags: ["Moods"],
+				summary: "Get mood by ID",
+				description: "Retrieve a specific mood by its unique identifier",
+			},
+		},
 	)
 	.use(moodsAdminRoute);

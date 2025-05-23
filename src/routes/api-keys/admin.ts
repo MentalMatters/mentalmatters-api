@@ -41,7 +41,15 @@ export const apiKeysAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 201,
 			});
 		},
-		{ body: adminCreateApiKeySchema },
+		{
+			body: adminCreateApiKeySchema,
+			detail: {
+				tags: ["Admin", "API Keys"],
+				summary: "Create API key (admin)",
+				operationId: "adminCreateApiKey",
+				description: "Creates a new API key with specified role (admin only)",
+			},
+		},
 	)
 
 	.get(
@@ -53,7 +61,16 @@ export const apiKeysAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 200,
 			});
 		},
-		{ query: adminListApiKeysSchema },
+		{
+			query: adminListApiKeysSchema,
+			detail: {
+				tags: ["Admin", "API Keys"],
+				summary: "List all API keys",
+				operationId: "adminListApiKeys",
+				description:
+					"Retrieves a list of all API keys in the system (admin only)",
+			},
+		},
 	)
 
 	.patch(
@@ -85,5 +102,14 @@ export const apiKeysAdminRoute = new Elysia({ prefix: "/admin" })
 				status: 200,
 			});
 		},
-		{ params: adminRevokeApiKeyParamsSchema },
+		{
+			params: adminRevokeApiKeyParamsSchema,
+			detail: {
+				tags: ["Admin", "API Keys"],
+				summary: "Revoke API key",
+				operationId: "adminRevokeApiKey",
+				description:
+					"Revokes an API key by its ID, preventing further use (admin only)",
+			},
+		},
 	);

@@ -1,3 +1,4 @@
+import swagger from "@elysiajs/swagger";
 import { Elysia } from "elysia";
 import type { Server } from "elysia/dist/universal/server";
 import { formatResponse } from "@/utils";
@@ -18,6 +19,56 @@ export let server: Server | null = null;
 const { RATE_LIMIT_HEADERS, RATE_LIMIT_VERBOSE } = Bun.env;
 
 export const app = new Elysia()
+	.use(
+		swagger({
+			path: "/docs",
+
+			documentation: {
+				info: {
+					title: "MentalMatters API",
+					version: "1.0.0",
+					description: "Making mental health accessible to everyone.",
+				},
+				tags: [
+					{
+						name: "Affirmations",
+						description:
+							"Affirmations are positive statements that can be used to boost mental well-being.",
+					},
+					{
+						name: "Languages",
+						description:
+							"Supported languages for content localization, enabling mental health resources to be accessible across different cultures and regions.",
+					},
+					{
+						name: "Moods",
+						description:
+							"Emotional states categorized to help users identify, track, and understand their feelings as part of mental wellness management.",
+					},
+					{
+						name: "Quotes",
+						description:
+							"Inspirational and supportive statements from various sources that provide motivation, comfort, and perspective for mental health journeys.",
+					},
+					{
+						name: "Resources",
+						description:
+							"Curated mental health support services, tools, and educational materials for crisis intervention and ongoing wellness.",
+					},
+					{
+						name: "Tags",
+						description:
+							"Categorization labels that organize content by themes, making it easier to find relevant mental health resources and information.",
+					},
+					{
+						name: "API Keys",
+						description:
+							"API keys for authentication and access control to the Mental Matters API.",
+					},
+				],
+			},
+		}),
+	)
 	// Rate limiting plugin
 	.use(
 		rateLimitPlugin({
@@ -32,14 +83,24 @@ export const app = new Elysia()
 	)
 
 	// Root route
-	.get("/", () =>
-		formatResponse({
-			body: {
-				message:
-					"Hello, friend! Remember, you matter and support is always here for you. Take care.",
+	.get(
+		"/",
+		() =>
+			formatResponse({
+				body: {
+					message:
+						"Hello, friend! Remember, you matter and support is always here for you. Take care.",
+					github: "https://github.com/mentalmatters/mentalmatters-api",
+				},
+				status: 200,
+			}),
+		{
+			detail: {
+				tags: ["Root"],
+				summary: "Welcome to MentalMatters API",
+				description: "The root route of the API, providing a welcome message.",
 			},
-			status: 200,
-		}),
+		},
 	)
 
 	// API routes

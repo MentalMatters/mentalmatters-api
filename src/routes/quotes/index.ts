@@ -31,7 +31,16 @@ export const quotesRoute = new Elysia({ prefix: "/quotes" })
 				status: 200,
 			});
 		},
-		{ query: getQuotesSchema },
+		{
+			query: getQuotesSchema,
+			detail: {
+				tags: ["Quotes"],
+				summary: "Get all quotes",
+				operationId: "getAllQuotes",
+				description:
+					"Retrieve a list of all quotes with optional filtering by language, category, or author",
+			},
+		},
 	)
 
 	.get(
@@ -59,6 +68,14 @@ export const quotesRoute = new Elysia({ prefix: "/quotes" })
 				status: 200,
 			});
 		},
-		{ params: idParamSchema },
+		{
+			params: idParamSchema,
+			detail: {
+				tags: ["Quotes"],
+				summary: "Get quote by ID",
+				operationId: "getQuoteById",
+				description: "Retrieve a specific quote by its unique identifier",
+			},
+		},
 	)
 	.use(quotesAdminRoute);
