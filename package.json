@@ -15,7 +15,11 @@
 		"db:migrate": "drizzle-kit migrate",
 		"db:push": "drizzle-kit push",
 		"db:studio": "drizzle-kit studio",
-		"db:seed": "ts-node --esm ./src/server/db/seed"
+		"db:seed": "ts-node --esm ./src/server/db/seed",
+		"create-admin": "bun run scripts/create-first-admin.ts",
+		"generate-secret": "bun run scripts/generate-secret.ts",
+		"setup-admin": "./scripts/setup-admin.sh",
+		"test-admin": "bun run scripts/test-admin-creation.ts"
 	},
 	"dependencies": {
 		"@elysiajs/cors": "^1.3.3",
