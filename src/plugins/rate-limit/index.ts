@@ -34,11 +34,11 @@ type SlidingWindowStore = Map<
 
 const getClientIdentifier = (
 	request: Request,
-	server: any,
-	keyGenerator?: (req: Request, srv: any) => string,
+	server: Bun.Server | null,
+	keyGenerator?: (req: Request, srv: Bun.Server) => string,
 ): string => {
 	try {
-		if (keyGenerator) {
+		if (keyGenerator && server) {
 			const key = keyGenerator(request, server);
 			return typeof key === "string" ? key : "unknown";
 		}

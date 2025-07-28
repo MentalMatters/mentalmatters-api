@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { randomBytes } from "crypto";
+import { randomBytes } from "node:crypto";
 
 /**
  * Utility script to generate a secure random string for ADMIN_CREATION_SECRET

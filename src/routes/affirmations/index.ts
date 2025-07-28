@@ -222,6 +222,7 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 		async ({ body, apiKey }) => {
 			try {
 				const newAffirmationEntity = await db.transaction(async (tx) => {
+					apiKey;
 					const [created] = await tx
 						.insert(affirmations)
 						.values({
@@ -235,10 +236,11 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 
 					if (!created) throw new Error("Failed to create affirmation.");
 
-					if (body.tags?.length) {
-						const uniqueTags = [
+					if (Array.isArray(body.tags) && body.tags.length) {
+						const tagsArray: string[] = body.tags as string[];
+						const uniqueTags: string[] = [
 							...new Set(
-								body.tags
+								tagsArray
 									.map((tag) => (typeof tag === "string" ? tag.trim() : ""))
 									.filter((tag) => tag !== ""),
 							),
@@ -247,16 +249,16 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 						if (uniqueTags.length) {
 							await tx
 								.insert(tags)
-								.values(uniqueTags.map((name) => ({ name })))
+								.values(uniqueTags.map((name: string) => ({ name })))
 								.onConflictDoNothing({ target: tags.name });
 
-							const tagRecords = await tx
+							const tagRecords: { id: number }[] = await tx
 								.select()
 								.from(tags)
 								.where(inArray(tags.name, uniqueTags));
 
 							await tx.insert(affirmationTags).values(
-								tagRecords.map((tag) => ({
+								tagRecords.map((tag: { id: number }) => ({
 									affirmationId: created.id,
 									tagId: tag.id,
 								})),

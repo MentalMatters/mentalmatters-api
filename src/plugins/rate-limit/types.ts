@@ -33,7 +33,7 @@ export interface RateLimitOptions {
 	/** Enable detailed logging */
 	verbose?: boolean;
 	/** Custom key generator function */
-	keyGenerator?: (request: Request, server: any) => string;
+	keyGenerator?: (request: Request, server: Bun.Server) => string;
 	/** Custom store implementation */
 	store?: RateLimitStore;
 	/** Headers to include in the response */
