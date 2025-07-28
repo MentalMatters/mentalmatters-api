@@ -15,15 +15,13 @@ export const adminCreateApiKeySchema = t.Intersect([
 ]);
 
 export const adminRevokeApiKeyParamsSchema = t.Object({
-	id: t.String(),
+	id: t.Number(),
 });
 
-export const adminListApiKeysSchema = t.Intersect([
-	t.Object({
-		role: t.Optional(t.Enum(ApiKeyRole)),
-		revoked: t.Optional(t.Boolean()),
-		page: t.Optional(t.Number()),
-		limit: t.Optional(t.Number()),
-	}),
-	createApiKeySchema, // adds optional label
-]);
+export const adminListApiKeysSchema = t.Object({
+	role: t.Optional(t.Enum(ApiKeyRole)),
+	revoked: t.Optional(t.Boolean()),
+	page: t.Optional(t.Number({ minimum: 1 })),
+	limit: t.Optional(t.Number({ minimum: 1, maximum: 100 })),
+	label: t.Optional(t.String()),
+});

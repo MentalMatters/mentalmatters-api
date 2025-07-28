@@ -23,20 +23,41 @@ export const quotesAdminRoute = new Elysia({
 	.post(
 		"/",
 		async ({ body }) => {
-			const [created] = await db
-				.insert(quotes)
-				.values({
-					quoteText: body.quoteText,
-					author: body.author,
-					category: body.category,
-					language: body.language,
-				})
-				.returning();
+			try {
+				// Check if quote already exists (case-insensitive)
+				const existingQuote = await db
+					.select()
+					.from(quotes)
+					.where(eq(quotes.quoteText, body.quoteText));
 
-			return formatResponse({
-				body: { message: "Quote created", quote: created },
-				status: 201,
-			});
+				if (existingQuote.length > 0) {
+					return formatResponse({
+						body: { message: "Quote already exists" },
+						status: 409,
+					});
+				}
+
+				const [created] = await db
+					.insert(quotes)
+					.values({
+						quoteText: body.quoteText.trim(),
+						author: body.author?.trim() || null,
+						category: body.category?.trim() || null,
+						language: body.language,
+					})
+					.returning();
+
+				return formatResponse({
+					body: { message: "Quote created successfully", quote: created },
+					status: 201,
+				});
+			} catch (error) {
+				console.error("Error creating quote:", error);
+				return formatResponse({
+					body: { message: "Internal server error" },
+					status: 500,
+				});
+			}
 		},
 		{
 			body: createQuoteSchema,
@@ -53,42 +74,83 @@ export const quotesAdminRoute = new Elysia({
 	.put(
 		"/:id",
 		async ({ params, body }) => {
-			const id = Number(params.id);
-			if (Number.isNaN(id)) {
-				return formatResponse({
-					body: { message: "Invalid quote ID" },
-					status: 400,
-				});
-			}
+			try {
+				const id = Number(params.id);
+				if (Number.isNaN(id) || id <= 0) {
+					return formatResponse({
+						body: { message: "Invalid quote ID. Must be a positive number." },
+						status: 400,
+					});
+				}
 
-			const [existing] = await db
-				.select()
-				.from(quotes)
-				.where(eq(quotes.id, id));
+				const [existing] = await db
+					.select()
+					.from(quotes)
+					.where(eq(quotes.id, id));
 
-			if (!existing) {
-				return formatResponse({
-					body: { message: "Quote not found" },
-					status: 404,
-				});
-			}
+				if (!existing) {
+					return formatResponse({
+						body: { message: "Quote not found" },
+						status: 404,
+					});
+				}
 
-			const [updated] = await db
-				.update(quotes)
-				.set({
-					quoteText: body.quoteText ?? existing.quoteText,
-					author: body.author ?? existing.author,
-					category: body.category ?? existing.category,
-					language: body.language ?? existing.language,
+				// Check if the new quote text already exists (if it's being changed)
+				if (body.quoteText && body.quoteText !== existing.quoteText) {
+					const duplicateQuote = await db
+						.select()
+						.from(quotes)
+						.where(eq(quotes.quoteText, body.quoteText));
+
+					if (duplicateQuote.length > 0) {
+						return formatResponse({
+							body: { message: "Quote text already exists" },
+							status: 409,
+						});
+					}
+				}
+
+				const updateData: Partial<{
+					quoteText: string;
+					author: string | null;
+					category: string | null;
+					language: string;
+					updatedAt: Date;
+				}> = {
 					updatedAt: new Date(),
-				})
-				.where(eq(quotes.id, id))
-				.returning();
+				};
 
-			return formatResponse({
-				body: { message: "Quote updated", quote: updated },
-				status: 200,
-			});
+				// Only update fields that are provided
+				if (body.quoteText !== undefined) {
+					updateData.quoteText = body.quoteText.trim();
+				}
+				if (body.author !== undefined) {
+					updateData.author = body.author?.trim() || null;
+				}
+				if (body.category !== undefined) {
+					updateData.category = body.category?.trim() || null;
+				}
+				if (body.language !== undefined) {
+					updateData.language = body.language;
+				}
+
+				const [updated] = await db
+					.update(quotes)
+					.set(updateData)
+					.where(eq(quotes.id, id))
+					.returning();
+
+				return formatResponse({
+					body: { message: "Quote updated successfully", quote: updated },
+					status: 200,
+				});
+			} catch (error) {
+				console.error("Error updating quote:", error);
+				return formatResponse({
+					body: { message: "Internal server error" },
+					status: 500,
+				});
+			}
 		},
 		{
 			body: updateQuoteSchema,
@@ -106,30 +168,38 @@ export const quotesAdminRoute = new Elysia({
 	.delete(
 		"/:id",
 		async ({ params }) => {
-			const id = Number(params.id);
-			if (Number.isNaN(id)) {
+			try {
+				const id = Number(params.id);
+				if (Number.isNaN(id) || id <= 0) {
+					return formatResponse({
+						body: { message: "Invalid quote ID. Must be a positive number." },
+						status: 400,
+					});
+				}
+
+				const [deleted] = await db
+					.delete(quotes)
+					.where(eq(quotes.id, id))
+					.returning();
+
+				if (!deleted) {
+					return formatResponse({
+						body: { message: "Quote not found" },
+						status: 404,
+					});
+				}
+
 				return formatResponse({
-					body: { message: "Invalid quote ID" },
-					status: 400,
+					body: { message: "Quote deleted successfully" },
+					status: 200,
+				});
+			} catch (error) {
+				console.error("Error deleting quote:", error);
+				return formatResponse({
+					body: { message: "Internal server error" },
+					status: 500,
 				});
 			}
-
-			const [deleted] = await db
-				.delete(quotes)
-				.where(eq(quotes.id, id))
-				.returning();
-
-			if (!deleted) {
-				return formatResponse({
-					body: { message: "Quote not found" },
-					status: 404,
-				});
-			}
-
-			return formatResponse({
-				body: { message: "Quote deleted" },
-				status: 200,
-			});
 		},
 		{
 			params: idParamSchema,

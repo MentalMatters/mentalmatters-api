@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import Elysia, { t } from "elysia";
 import { apiKeyPlugin } from "@/plugins/apiKey";
 import { formatResponse } from "@/utils";
@@ -15,17 +15,43 @@ export const moodsRoute = new Elysia({ prefix: "/moods" })
 	.get(
 		"/",
 		async ({ query }) => {
-			const filters = [
-				query.language ? eq(moods.language, query.language) : undefined,
-			].filter(Boolean);
+			// Build where conditions
+			const conditions = [];
+
+			if (query.language) {
+				conditions.push(eq(moods.language, query.language));
+			}
+
+			// Get total count for pagination
+			const totalCountQuery = await db
+				.select({ count: sql<number>`count(*)` })
+				.from(moods)
+				.where(conditions.length ? and(...conditions) : undefined);
+
+			const total = totalCountQuery[0]?.count || 0;
+			const page = Math.max(1, query.page || 1);
+			const limit = Math.min(100, Math.max(1, query.limit || 10));
+			const offset = (page - 1) * limit;
+			const totalPages = Math.ceil(total / limit);
 
 			const allMoods = await db
 				.select()
 				.from(moods)
-				.where(filters.length ? and(...filters) : undefined);
+				.where(conditions.length ? and(...conditions) : undefined)
+				.orderBy(desc(moods.createdAt))
+				.limit(limit)
+				.offset(offset);
 
 			return formatResponse({
-				body: { moods: allMoods },
+				body: {
+					moods: allMoods,
+					pagination: {
+						page,
+						limit,
+						total,
+						totalPages,
+					},
+				},
 				status: 200,
 			});
 		},
@@ -35,7 +61,7 @@ export const moodsRoute = new Elysia({ prefix: "/moods" })
 				tags: ["Moods"],
 				summary: "Get all moods",
 				description:
-					"Retrieve a list of all moods with optional language filtering",
+					"Retrieve a list of all moods with optional language filtering and pagination",
 			},
 		},
 	)

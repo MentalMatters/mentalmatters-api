@@ -1,72 +1,132 @@
-import { eq, sql } from "drizzle-orm";
-import type { Elysia } from "elysia";
+import { eq } from "drizzle-orm";
+import { Elysia } from "elysia";
+import { db } from "@/db";
+import { apiKeys } from "@/db/schema";
 import { formatResponse } from "@/utils";
-import { db } from "../db";
-import { type ApiKeyRole, apiKeys } from "../db/schema";
 
-export const apiKeyPlugin = (options?: {
+export interface ApiKeyContext {
+	apiKey: string | null;
+	userId: number | null;
+	role: "USER" | "ADMIN" | null;
+	isValid: boolean;
+}
+
+export interface ApiKeyOptions {
+	/** Header name for API key */
 	headerName?: string;
-	requiredRole?: ApiKeyRole;
-}) => {
-	const headerName = (options?.headerName || "x-api-key").toLowerCase();
+	/** Whether to require API key (default: true) */
+	required?: boolean;
+	/** Whether to allow admin bypass for certain operations */
+	allowAdminBypass?: boolean;
+	/** Custom error message */
+	errorMessage?: string;
+}
 
-	return (app: Elysia) =>
-		app.derive(async ({ request }) => {
-			const apiKeyValue = request.headers.get(headerName);
+const DEFAULT_OPTIONS: Required<ApiKeyOptions> = {
+	headerName: "x-api-key",
+	required: true,
+	allowAdminBypass: false,
+	errorMessage: "Valid API key is required for this operation.",
+};
 
-			if (!apiKeyValue) {
-				throw formatResponse({
-					body: { message: "Unauthorized: Missing API key" },
-					status: 401,
-				});
-			}
+export const apiKeyPlugin = (options: ApiKeyOptions = {}) => {
+	const config = { ...DEFAULT_OPTIONS, ...options };
 
-			const [keyRecord] = await db
-				.select()
+	return new Elysia().derive(async ({ request, set }) => {
+		const apiKeyValue = request.headers.get(config.headerName);
+
+		// If API key is not required, return early
+		if (!config.required && !apiKeyValue) {
+			return {
+				apiKey: null,
+				userId: null,
+				role: null,
+				isValid: false,
+			};
+		}
+
+		// If API key is required but not provided
+		if (config.required && !apiKeyValue) {
+			set.status = 401;
+			throw formatResponse({
+				body: {
+					message: config.errorMessage,
+					error: "MISSING_API_KEY",
+				},
+				status: 401,
+			});
+		}
+
+		// At this point, if required is true, apiKeyValue is guaranteed to be non-null
+		if (!apiKeyValue) {
+			return {
+				apiKey: null,
+				userId: null,
+				role: null,
+				isValid: false,
+			};
+		}
+
+		try {
+			// Validate API key in database
+			const keyRecord = await db
+				.select({
+					id: apiKeys.id,
+					key: apiKeys.key,
+					role: apiKeys.role,
+					revoked: apiKeys.revoked,
+				})
 				.from(apiKeys)
-				.where(eq(apiKeys.key, apiKeyValue));
+				.where(eq(apiKeys.key, apiKeyValue))
+				.get();
 
-			if (!keyRecord) {
+			// Check if key exists and is not revoked
+			if (!keyRecord || keyRecord.revoked) {
+				set.status = 401;
 				throw formatResponse({
-					body: { message: "Unauthorized: Invalid API key" },
+					body: {
+						message: "Invalid or revoked API key.",
+						error: "INVALID_API_KEY",
+					},
 					status: 401,
 				});
 			}
 
-			if (keyRecord.revoked) {
-				throw formatResponse({
-					body: { message: "Unauthorized: Your API key has been revoked" },
-					status: 401,
-				});
-			}
-
-			// Role logic: ADMIN can access USER routes, but not vice versa
-			if (options?.requiredRole) {
-				if (options.requiredRole === "ADMIN" && keyRecord.role !== "ADMIN") {
-					throw formatResponse({
-						body: { message: "Forbidden: Insufficient API key role" },
-						status: 403,
-					});
-				}
-				// If requiredRole is USER, allow both USER and ADMIN
-				if (
-					options.requiredRole === "USER" &&
-					keyRecord.role !== "USER" &&
-					keyRecord.role !== "ADMIN"
-				) {
-					throw formatResponse({
-						body: { message: "Forbidden: Insufficient API key role" },
-						status: 403,
-					});
-				}
-			}
-
-			// Update lastUsed timestamp
+			// Update last used timestamp
 			await db
 				.update(apiKeys)
-				.set({ lastUsed: sql`(strftime('%s', 'now'))` })
+				.set({ lastUsed: new Date() })
 				.where(eq(apiKeys.id, keyRecord.id));
 
-			return { apiKey: keyRecord };
-		});
+			return {
+				apiKey: keyRecord.key,
+				userId: keyRecord.id,
+				role: keyRecord.role,
+				isValid: true,
+			};
+		} catch (error) {
+			console.error("API key validation error:", error);
+			set.status = 500;
+			throw formatResponse({
+				body: {
+					message: "Error validating API key. Please try again.",
+					error: "VALIDATION_ERROR",
+				},
+				status: 500,
+			});
+		}
+	});
+};
+
+// Helper function to check if user has admin role
+export const requireAdmin = (context: ApiKeyContext): boolean => {
+	return context.isValid && context.role === "ADMIN";
+};
+
+// Helper function to check if user has specific role
+export const requireRole = (
+	context: ApiKeyContext,
+	role: "USER" | "ADMIN",
+): boolean => {
+	return context.isValid && context.role === role;
 };

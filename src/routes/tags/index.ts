@@ -1,4 +1,4 @@
-import { eq, like } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import Elysia, { t } from "elysia";
 import { apiKeyPlugin } from "@/plugins/apiKey";
 import { formatResponse } from "@/utils";
@@ -6,6 +6,7 @@ import { db } from "../../db";
 import { ApiKeyRole, tags } from "../../db/schema";
 import { tagsAdminRoute } from "./admin";
 import { getTagsSchema } from "./schema";
+import { getTagsWithPagination, validateTagId } from "./utils";
 
 const idParamSchema = t.Object({ id: t.String() });
 
@@ -15,16 +16,27 @@ export const tagsRoute = new Elysia({ prefix: "/tags" })
 	.get(
 		"/",
 		async ({ query }) => {
-			const filter = query.name
-				? like(tags.name, `%${query.name}%`)
-				: undefined;
+			try {
+				const page = query.page || 1;
+				const limit = query.limit || 20;
+				const filter = query.name;
 
-			const allTags = await db.select().from(tags).where(filter);
+				const result = await getTagsWithPagination(filter, page, limit);
 
-			return formatResponse({
-				body: { tags: allTags },
-				status: 200,
-			});
+				return formatResponse({
+					body: {
+						tags: result.tags,
+						pagination: result.pagination,
+					},
+					status: 200,
+				});
+			} catch (error) {
+				console.error("Error fetching tags:", error);
+				return formatResponse({
+					body: { message: "Internal server error" },
+					status: 500,
+				});
+			}
 		},
 		{
 			query: getTagsSchema,
@@ -33,7 +45,7 @@ export const tagsRoute = new Elysia({ prefix: "/tags" })
 				summary: "Get all tags",
 				operationId: "getAllTags",
 				description:
-					"Retrieve a list of all tags with optional filtering by name",
+					"Retrieve a list of all tags with optional filtering by name and pagination",
 			},
 		},
 	)
@@ -41,27 +53,38 @@ export const tagsRoute = new Elysia({ prefix: "/tags" })
 	.get(
 		"/:id",
 		async ({ params }) => {
-			const id = Number(params.id);
-			if (Number.isNaN(id)) {
+			try {
+				const { isValid, numericId } = validateTagId(params.id);
+				if (!isValid || !numericId) {
+					return formatResponse({
+						body: { message: "Invalid tag ID" },
+						status: 400,
+					});
+				}
+
+				const [tag] = await db
+					.select()
+					.from(tags)
+					.where(eq(tags.id, numericId));
+
+				if (!tag) {
+					return formatResponse({
+						body: { message: "Tag not found" },
+						status: 404,
+					});
+				}
+
 				return formatResponse({
-					body: { message: "Invalid tag ID" },
-					status: 400,
+					body: { tag },
+					status: 200,
+				});
+			} catch (error) {
+				console.error("Error fetching tag:", error);
+				return formatResponse({
+					body: { message: "Internal server error" },
+					status: 500,
 				});
 			}
-
-			const [tag] = await db.select().from(tags).where(eq(tags.id, id));
-
-			if (!tag) {
-				return formatResponse({
-					body: { message: "Tag not found" },
-					status: 404,
-				});
-			}
-
-			return formatResponse({
-				body: { tag },
-				status: 200,
-			});
 		},
 		{
 			params: idParamSchema,

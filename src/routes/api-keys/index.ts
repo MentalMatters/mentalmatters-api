@@ -11,29 +11,37 @@ export const apiKeysRoute = new Elysia({ prefix: "/api-key" })
 	.post(
 		"/",
 		async ({ body }) => {
-			const newKey = uuid();
+			try {
+				const newKey = uuid();
 
-			const [created] = await db
-				.insert(apiKeys)
-				.values({
-					key: newKey,
-					label: body?.label,
-					role: ApiKeyRole.USER,
-					revoked: 0,
-				})
-				.returning();
+				const [created] = await db
+					.insert(apiKeys)
+					.values({
+						key: newKey,
+						label: body?.label,
+						role: ApiKeyRole.USER,
+						revoked: 0,
+					})
+					.returning();
 
-			return formatResponse({
-				body: {
-					message: "API key created",
-					apiKey: {
-						key: created.key,
-						role: created.role,
-						createdAt: created.createdAt,
+				return formatResponse({
+					body: {
+						message: "API key created successfully",
+						apiKey: {
+							key: created.key,
+							role: created.role,
+							createdAt: created.createdAt,
+						},
 					},
-				},
-				status: 201,
-			});
+					status: 201,
+				});
+			} catch (error) {
+				console.error("Error creating API key:", error);
+				return formatResponse({
+					body: { message: "Failed to create API key" },
+					status: 500,
+				});
+			}
 		},
 		{
 			body: createApiKeySchema,
@@ -45,6 +53,12 @@ export const apiKeysRoute = new Elysia({ prefix: "/api-key" })
 				responses: {
 					201: {
 						description: "API key created successfully",
+					},
+					400: {
+						description: "Bad request - Invalid input data",
+					},
+					500: {
+						description: "Internal server error",
 					},
 				},
 			},

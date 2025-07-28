@@ -5,6 +5,7 @@ import { formatResponse } from "@/utils";
 import { db } from "../../db";
 import { ApiKeyRole, tags } from "../../db/schema";
 import { createTagSchema, updateTagSchema } from "./schema";
+import { checkTagNameExists, sanitizeString, validateTagId } from "./utils";
 
 const idParamSchema = t.Object({ id: t.String() });
 
@@ -15,29 +16,40 @@ export const tagsAdminRoute = new Elysia({ prefix: "/admin" })
 		"/",
 		async ({ body }) => {
 			try {
-				const [createdTag] = await db
-					.insert(tags)
-					.values({ name: body.name })
-					.onConflictDoNothing({ target: tags.name })
-					.returning();
+				const sanitizedName = sanitizeString(body.name);
 
-				if (!createdTag) {
+				if (!sanitizedName) {
 					return formatResponse({
-						body: { message: "Tag already exists." },
+						body: { message: "Tag name is required" },
+						status: 400,
+					});
+				}
+
+				// Check if tag already exists
+				const nameExists = await checkTagNameExists(sanitizedName);
+				if (nameExists) {
+					return formatResponse({
+						body: { message: "Tag with this name already exists" },
 						status: 409,
 					});
 				}
 
+				const [createdTag] = await db
+					.insert(tags)
+					.values({ name: sanitizedName })
+					.returning();
+
 				return formatResponse({
 					body: {
-						message: "Tag created",
+						message: "Tag created successfully",
 						tag: createdTag,
 					},
 					status: 201,
 				});
-			} catch {
+			} catch (error) {
+				console.error("Error creating tag:", error);
 				return formatResponse({
-					body: { message: "Failed to create tag." },
+					body: { message: "Internal server error" },
 					status: 500,
 				});
 			}
@@ -56,38 +68,76 @@ export const tagsAdminRoute = new Elysia({ prefix: "/admin" })
 	.put(
 		"/:id",
 		async ({ params, body }) => {
-			const id = Number(params.id);
-			if (Number.isNaN(id)) {
+			try {
+				const { isValid, numericId } = validateTagId(params.id);
+				if (!isValid || !numericId) {
+					return formatResponse({
+						body: { message: "Invalid tag ID" },
+						status: 400,
+					});
+				}
+
+				const [existing] = await db
+					.select()
+					.from(tags)
+					.where(eq(tags.id, numericId));
+
+				if (!existing) {
+					return formatResponse({
+						body: { message: "Tag not found" },
+						status: 404,
+					});
+				}
+
+				// If name is being updated, check for conflicts
+				if (body.name && body.name !== existing.name) {
+					const sanitizedName = sanitizeString(body.name);
+					if (!sanitizedName) {
+						return formatResponse({
+							body: { message: "Tag name is required" },
+							status: 400,
+						});
+					}
+
+					const nameExists = await checkTagNameExists(sanitizedName, numericId);
+					if (nameExists) {
+						return formatResponse({
+							body: { message: "Tag with this name already exists" },
+							status: 409,
+						});
+					}
+				}
+
+				const sanitizedName = body.name ? sanitizeString(body.name) : null;
+				if (body.name && !sanitizedName) {
+					return formatResponse({
+						body: { message: "Invalid tag name" },
+						status: 400,
+					});
+				}
+
+				const [updated] = await db
+					.update(tags)
+					.set({
+						name: sanitizedName || existing.name,
+					})
+					.where(eq(tags.id, numericId))
+					.returning();
+
 				return formatResponse({
-					body: { message: "Invalid tag ID" },
-					status: 400,
+					body: {
+						message: "Tag updated successfully",
+						tag: updated,
+					},
+					status: 200,
+				});
+			} catch (error) {
+				console.error("Error updating tag:", error);
+				return formatResponse({
+					body: { message: "Internal server error" },
+					status: 500,
 				});
 			}
-
-			const [existing] = await db.select().from(tags).where(eq(tags.id, id));
-
-			if (!existing) {
-				return formatResponse({
-					body: { message: "Tag not found" },
-					status: 404,
-				});
-			}
-
-			const [updated] = await db
-				.update(tags)
-				.set({
-					name: body.name ?? existing.name,
-				})
-				.where(eq(tags.id, id))
-				.returning();
-
-			return formatResponse({
-				body: {
-					message: "Tag updated",
-					tag: updated,
-				},
-				status: 200,
-			});
 		},
 		{
 			body: updateTagSchema,
@@ -104,30 +154,41 @@ export const tagsAdminRoute = new Elysia({ prefix: "/admin" })
 	.delete(
 		"/:id",
 		async ({ params }) => {
-			const id = Number(params.id);
-			if (Number.isNaN(id)) {
+			try {
+				const { isValid, numericId } = validateTagId(params.id);
+				if (!isValid || !numericId) {
+					return formatResponse({
+						body: { message: "Invalid tag ID" },
+						status: 400,
+					});
+				}
+
+				const [deleted] = await db
+					.delete(tags)
+					.where(eq(tags.id, numericId))
+					.returning();
+
+				if (!deleted) {
+					return formatResponse({
+						body: { message: "Tag not found" },
+						status: 404,
+					});
+				}
+
 				return formatResponse({
-					body: { message: "Invalid tag ID" },
-					status: 400,
+					body: {
+						message: "Tag deleted successfully",
+						deletedTag: deleted,
+					},
+					status: 200,
+				});
+			} catch (error) {
+				console.error("Error deleting tag:", error);
+				return formatResponse({
+					body: { message: "Internal server error" },
+					status: 500,
 				});
 			}
-
-			const [deleted] = await db
-				.delete(tags)
-				.where(eq(tags.id, id))
-				.returning();
-
-			if (!deleted) {
-				return formatResponse({
-					body: { message: "Tag not found" },
-					status: 404,
-				});
-			}
-
-			return formatResponse({
-				body: { message: "Tag deleted" },
-				status: 200,
-			});
 		},
 		{
 			params: idParamSchema,

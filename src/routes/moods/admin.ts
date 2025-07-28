@@ -14,23 +14,37 @@ export const moodsAdminRoute = new Elysia({ prefix: "/admin" })
 	.post(
 		"/",
 		async ({ body }) => {
-			const [created] = await db
-				.insert(moods)
-				.values({
-					name: body.name,
-					description: body.description,
-					language: body.language,
-					emoji: body.emoji,
-				})
-				.returning();
+			try {
+				const [created] = await db
+					.insert(moods)
+					.values({
+						name: body.name,
+						description: body.description,
+						language: body.language,
+						emoji: body.emoji,
+					})
+					.returning();
 
-			return formatResponse({
-				body: {
-					message: "Mood created successfully",
-					mood: created,
-				},
-				status: 201,
-			});
+				return formatResponse({
+					body: {
+						message: "Mood created successfully",
+						mood: created,
+					},
+					status: 201,
+				});
+			} catch (error) {
+				// Handle unique constraint violation
+				if (
+					error instanceof Error &&
+					error.message.includes("UNIQUE constraint failed")
+				) {
+					return formatResponse({
+						body: { message: "A mood with this name already exists" },
+						status: 409,
+					});
+				}
+				throw error;
+			}
 		},
 		{
 			body: createMoodSchema,
@@ -53,31 +67,51 @@ export const moodsAdminRoute = new Elysia({ prefix: "/admin" })
 				});
 			}
 
-			const [updated] = await db
-				.update(moods)
-				.set({
-					name: body.name,
-					description: body.description,
-					language: body.language,
-					emoji: body.emoji,
-				})
-				.where(eq(moods.id, id))
-				.returning();
+			// Check if mood exists before updating
+			const [existingMood] = await db
+				.select()
+				.from(moods)
+				.where(eq(moods.id, id));
 
-			if (!updated) {
+			if (!existingMood) {
 				return formatResponse({
 					body: { message: "Mood not found" },
 					status: 404,
 				});
 			}
 
-			return formatResponse({
-				body: {
-					message: "Mood updated successfully",
-					mood: updated,
-				},
-				status: 200,
-			});
+			try {
+				const [updated] = await db
+					.update(moods)
+					.set({
+						name: body.name,
+						description: body.description,
+						language: body.language,
+						emoji: body.emoji,
+					})
+					.where(eq(moods.id, id))
+					.returning();
+
+				return formatResponse({
+					body: {
+						message: "Mood updated successfully",
+						mood: updated,
+					},
+					status: 200,
+				});
+			} catch (error) {
+				// Handle unique constraint violation
+				if (
+					error instanceof Error &&
+					error.message.includes("UNIQUE constraint failed")
+				) {
+					return formatResponse({
+						body: { message: "A mood with this name already exists" },
+						status: 409,
+					});
+				}
+				throw error;
+			}
 		},
 		{
 			params: idParamSchema,
