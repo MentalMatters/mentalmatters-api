@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import Elysia, { t } from "elysia";
 import { apiKeyPlugin } from "@/plugins/apiKey";
 import { formatResponse } from "@/utils";
@@ -72,54 +72,55 @@ export const affirmationsRoute = new Elysia({ prefix: "/affirmations" })
 			const offset = (page - 1) * limit;
 			const totalPages = Math.ceil(total / limit);
 
-			const rows = await db
+			// First, get the paginated affirmation IDs
+			const paginatedAffirmations = await db
 				.select({
 					id: affirmations.id,
 					text: affirmations.text,
 					category: affirmations.category,
 					language: affirmations.language,
-					tag: tags.name,
 				})
 				.from(affirmations)
-				.leftJoin(
-					affirmationTags,
-					eq(affirmations.id, affirmationTags.affirmationId),
-				)
-				.leftJoin(tags, eq(affirmationTags.tagId, tags.id))
 				.where(and(...conditions))
-				.orderBy(desc(affirmations.createdAt))
+				.orderBy(affirmations.id)
 				.limit(limit)
 				.offset(offset);
 
-			const affirmationsMap = new Map<
-				number,
-				{
-					id: number;
-					text: string;
-					category: string;
-					language: string;
-					tags: string[];
-				}
-			>();
+			// Then, get all tags for these affirmations
+			const affirmationIds = paginatedAffirmations.map((a) => a.id);
+			const tagsData = await db
+				.select({
+					affirmationId: affirmationTags.affirmationId,
+					tagName: tags.name,
+				})
+				.from(affirmationTags)
+				.innerJoin(tags, eq(affirmationTags.tagId, tags.id))
+				.where(inArray(affirmationTags.affirmationId, affirmationIds));
 
-			for (const row of rows) {
-				if (!affirmationsMap.has(row.id)) {
-					affirmationsMap.set(row.id, {
-						id: row.id,
-						text: row.text,
-						category: row.category,
-						language: row.language,
-						tags: [],
-					});
+			// Group tags by affirmation ID
+			const tagsMap = new Map<number, string[]>();
+			for (const tagData of tagsData) {
+				if (!tagsMap.has(tagData.affirmationId)) {
+					tagsMap.set(tagData.affirmationId, []);
 				}
-				if (row.tag) {
-					affirmationsMap.get(row.id)?.tags.push(row.tag);
+				const tags = tagsMap.get(tagData.affirmationId);
+				if (tags) {
+					tags.push(tagData.tagName);
 				}
 			}
 
+			// Combine affirmations with their tags
+			const affirmationsWithTags = paginatedAffirmations.map((affirmation) => ({
+				id: affirmation.id,
+				text: affirmation.text,
+				category: affirmation.category,
+				language: affirmation.language,
+				tags: tagsMap.get(affirmation.id) || [],
+			}));
+
 			return formatResponse({
 				body: {
-					affirmations: Array.from(affirmationsMap.values()),
+					affirmations: affirmationsWithTags,
 					pagination: {
 						page,
 						limit,
